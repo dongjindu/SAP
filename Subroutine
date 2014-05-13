@@ -1,0 +1,115 @@
+"Convert price and price quantity unit.
+form sub61  using peinh type ekpo-peinh
+                netpr type numeric
+          changing newpeinh type ekpo-peinh
+                   newnetpr type numeric
+                   returncode type i.
+  "1: Success although decimal points less than or equal to 2.
+  "-1: Failed as price quan is bigger than 99,999 after conversion. However, rounding result returned.
+  "0: Success
+data: l_decimalpoint type i value 0.
+data: l_i0 type i, l_i1 type i, l_num type i.
+data: l_string type string.
+
+    if peinh is initial. peinh = 1. endif.
+      l_string = netpr.
+      CONDENSE l_string NO-GAPS.
+    l_num = strlen( l_string ).
+    l_i0 = 0. l_i1 = 0.
+    while ( l_i0 < l_num ).
+      l_i0 = l_i0 + 1.
+    l_i1 = l_num - l_i0.
+      if l_string+l_i1(1) <> '0'.
+      exit.
+    endif.
+    endwhile.
+"  if sy-uname = 'HIS20166'. break-point. endif.
+    if l_num - l_i1 > 6.
+      message 'Decimal point is not found.' type 'E'.
+      else.
+        l_i1 = 5 - l_num + l_i1 + 1 - 2.
+    endif.
+    if l_i1 > 0.
+      do l_i1 times.
+        if peinh >= 10000.
+          returncode = -1. "No change.
+        else.
+          returncode = 0.
+          peinh = peinh * 10.
+          netpr = netpr * 10.
+        endif.
+      enddo.
+    else.
+      "No change but set returncode = 0.
+      returncode = 1.
+    endif.
+    newpeinh = peinh. newnetpr = netpr.
+endform.
+"Testing case.
+form sub6.
+  types: begin of t0,
+  peinh type ekpo-peinh,
+  netpr type p decimals 5,
+  end of t0.
+  types: begin of t1,
+  peinh type ekpo-peinh,
+  netpr type p decimals 2,
+  returncode type i,
+  end of t1.
+data: l_string type string.
+data: v_item type standard table of t0 with header line.
+data: v_item1 type standard table of t1 with header line.
+v_item-netpr = '0.0046'.
+append v_item.
+v_item-netpr = '0.4'.
+append v_item.
+v_item-netpr = '1.00000'.
+v_item-peinh = '10000'.
+append v_item.
+v_item-netpr = '1.32189'.
+append v_item.
+v_item-netpr = '123.1'.
+append v_item.
+v_item-netpr = '12000'.
+append v_item.
+v_item-netpr = '17000'.
+v_item-peinh = '1000'.
+append v_item.
+v_item-netpr = '10090.330026'.
+v_item-peinh = '1000'.
+append v_item.
+v_item-netpr = '0.33002'.
+v_item-peinh = '10000'. 
+append v_item.
+v_item-netpr = '0.00002'.
+v_item-peinh = '10'.
+append v_item.
+v_item-netpr = '0.01002'.
+v_item-peinh = '10'.
+append v_item.
+data: l_decimalpoint type i value 0.
+data: l_i0 type i, l_i1 type i, l_num type i.
+data: lreturncode type i.
+if sy-uname = 'HIS20166'. break-point. endif.
+loop at v_item.
+  clear v_item1.
+  perform sub61 using v_item-peinh v_item-netpr
+                changing v_item-peinh v_item-netpr lreturncode.
+  if lreturncode = -1.
+"    message 'Price quan is bigger than 99,999 after conv.' type 'E'.
+  endif.
+  move-corresponding v_item to v_item1.
+  v_item1-returncode = lreturncode.
+  append v_item1.
+  continue.
+endloop.
+"sort v_item by netpr peinh.
+"sort v_item1 by netpr peinh.
+data: li3 type i.
+loop at v_item.
+  li3 = sy-tabix.
+  read table v_item1 index li3 into v_item1.
+  write: /, 'Old:', v_item-peinh, v_item-netpr, 
+   'New: ', v_item1-peinh, v_item1-netpr, v_item1-returncode.
+endloop.
+endform.
