@@ -1,0 +1,327 @@
+form sub89. " Downloaded gui testing
+  types: begin of tt001,
+    aufnr type afko-aufnr,
+    perio type C length 6,
+    cntppc type C length 9,
+    end of tt001.
+  data: lt001 type standard table of tt001.
+  data: lwt001 type tt001.
+  types: begin of tt002,
+    aufnr type afko-aufnr,
+    perio type C length 6,
+    cntppc type i,
+    end of tt002.
+  data: lt002 type standard table of tt002.
+  data: lwt002 type tt002.
+"  perform sub81.
+  call function 'GUI_UPLOAD'
+    exporting
+      filename = 'C:\Users\HIS20166\Desktop\hmma\fs\101 ML CPZP backflsuh number of records.txt'
+      filetype = 'ASC'
+      has_field_separator = 'X'
+    tables
+      data_tab = lt001
+    Exceptions
+      file_open_error = 1
+      others = 21
+      .
+data: li001 type i value 0.
+  loop at lt001 into lwt001.
+    replace all occurences of ',' in lwt001-cntppc with ''.
+"    if li001 = 0 and sy-uname = 'HIS20166'. break-point. endif.
+    condense lwt001-cntppc.
+    lwt002-aufnr = lwt001-aufnr.
+    lwt002-perio = lwt001-perio.
+    lwt002-cntppc = lwt001-cntppc.
+    append lwt002 to lt002.
+  endloop.
+  sort lt002 by perio descending cntppc descending.
+data: lt002a type standard table of t002.
+data: ltabix type sy-tabix.
+data: lastperio type c length 6.
+  loop at lt002 into lwt002.
+    ltabix = sy-tabix.
+    if lwt002-perio ne lastperio.
+      li001 = 0.
+    elseif lwt002-perio = lastperio.
+      li001 = li001 + 1.
+    endif.
+    if li001 lt 10.
+      "do nothing.
+    elseif li001 ge 10.
+      delete lt002 index ltabix.
+    endif.
+    lastperio = lwt002-perio.
+  endloop.
+  if sy-uname = 'HIS20166'. break-point. endif.
+  exit.
+if sy-batch = 'X'.
+    loop at lt001 into lwt001.
+      write: / lwt001-aufnr, lwt001-perio, lwt001-cntppc.
+    endloop.
+else.
+  call function 'GUI_DOWNLOAD'
+    exporting
+      filename = 'C:\temp\backflushnumberofrecords.xls'
+      filetype = 'ASC'
+      WRITE_FIELD_SEPARATOR = 'X'
+    tables
+      data_tab = lt001
+    exceptions
+      file_write_error = 1
+    others = 22
+    .
+  refresh lt001. clear lwt001.
+  if sy-uname = 'HIS20166'. break-point. endif.
+endif.
+endform.
+form sub8. "Main analysis entry
+  types: begin of tt000,
+    aufnr type afko-aufnr,
+    orderid type ppc_head-orderid,
+"    accassobj type ppc_head-accassobj,
+    end of tt000.
+  data: lt000 type standard table of tt000.
+  data: lwt000 type tt000.
+  types: begin of tt001,
+     aufnr type afko-aufnr,
+     perio type c length 6,
+     cntppc type i,
+    end of tt001.
+  data: lt001 type standard table of tt001.
+  data: lwt001 type tt001.
+  constants: c_gmove_ind_0 type c length 1 value '0',
+             c_gmove_ind_3 type c length 1 value '3'.
+  data: perio90 type N length 6,
+        perio99 type N length 6,
+        perio type n length 6.
+  data: periofirstday type N length 8,
+        periolastday type N length 8.
+  data: year type N length 4.
+  data: month type N length 2.
+if sy-datum+6(2) < '28' and sy-datum+6(2) > '05'.
+  message 'Do not run in the middle of the month' type 'E'.
+elseif sy-datum+6(2) le '05'. "Last month
+  if sy-datum+4(2) = '01'. "January then December last year
+   perio90+0(4) = sy-datum+0(4) - 1.
+   perio90+4(2) = '12'.
+  else. "last month within same year
+    perio90+0(4) = sy-datum+0(4).
+    perio90+4(2) = sy-datum+4(2) - 1.
+  endif.
+elseif sy-datum+6(2) ge '28'. "This month
+   perio90 = sy-datum+0(6).
+endif.
+"perio90 = '201307'.
+"perio99 = '201404'.
+perio99 = perio90. "Only run one month.
+perio = perio90. "Initialize.
+    select distinct a~aufnr pk~orderid "pk~accassobj
+      into table lt000
+      from mara as m inner join afko as a
+         on a~plnbez = m~matnr
+         inner join aufk as au
+         on a~aufnr = au~aufnr
+         inner join qrp002 as q
+           on q~aufnr = au~aufnr
+         inner join ppc_head as pk
+           on q~cc_guid = pk~accassobj
+      where "m~mtart = 'FERT'
+         "and au~auart = 'RM01'
+         "and au~werks = 'P001'
+         au~auart = 'RM01'
+"         and ( au~aufnr = '000001161205'
+"            or au~aufnr = '000001165651' )
+      order by a~aufnr pk~orderid
+      .
+      sort lt000 by aufnr orderid.
+"      group by pk~accassobj
+data: li type i.
+data: lt0 type i value '0'.
+while perio le perio99.
+  concatenate perio '01' into periofirstday.
+  if perio+4(2) = '01' or perio+4(2) = '03' or
+    perio+4(2) = '05' or perio+4(2) = '07' or
+    perio+4(2) = '08' or perio+4(2) = '10' or
+    perio+4(2) = '12'.
+    concatenate perio '31' into periolastday.
+  elseif perio+4(2) = '04' or perio+4(2) = '06' or
+    perio+4(2) = '09' or perio+4(2) = '11'.
+    concatenate perio '30' into periolastday.
+  elseif perio+4(2) = '02'.
+    li = perio+0(4).
+    if li mod 4  = 0.
+      concatenate perio '29' into periolastday.
+    else.
+      concatenate perio '28' into periolastday.
+    endif.
+  endif.
+data: lastaufnr type afko-aufnr.
+loop at lt000 into lwt000.
+  SELECT
+    count(*) as cntppc
+  INTO lwt001-cntppc
+  FROM
+    ( ( ( PPC_HEAD AS T1 INNER JOIN PPC_CONF_MAT AS T4
+        ON T1~HEADID = T4~HEADID )
+      LEFT OUTER JOIN PPC_CONF_MAT_VAR AS T5
+        ON T4~HEADID = T5~HEADID AND
+           T4~ACCID = T5~ACCID )
+      INNER JOIN PPC_MAT_DET AS T2S
+        ON T4~ACCID = T2S~ACCID )
+      INNER JOIN PPC_MAT AS T2
+        ON T2S~MATID = T2~MATID
+  WHERE
+      T1~ORDERID eq lwt000-orderid AND
+      ( t2~gmove_ind EQ c_gmove_ind_0 OR        "n.708295
+        t2~gmove_ind EQ c_gmove_ind_3 ) AND     "n.708295
+"      T1~REPPOINT IN LT_REPPOINT_RANGES AND
+      T1~POSTDATE between periofirstday and periolastday    "Leo
+  GROUP BY
+    T1~REPPOINT
+    T2~MATNR
+    T2~WERKS
+    T2~LGORT
+    T2S~CHARG
+    T2~PRVBE
+    T2~GMOVE_IND
+    T2~SOBKZ
+    T2~KZBWS
+    T2~KZVBR
+    T2S~KDAUF
+    T2S~KDPOS
+    T2S~PSPNR
+    T2S~CALCNR
+    T4~CONFUNIT
+    T1~KDAUF
+    T1~KDPOS
+    T1~PSPNR
+    T1~FLG_REVERSAL
+    %_HINTS ORACLE '&SUBSTITUTE LITERALS&'
+            MSSQLNT '&SUBSTITUTE LITERALS&'
+            DB2     '&SUBSTITUTE LITERALS&'.
+   lwt001-aufnr = lwt000-aufnr.
+   lwt001-perio = perio.
+"   if lt0 = 0 and sy-uname = 'HIS20166'. break-point. endif.
+   collect lwt001 into lt001.
+ endselect.
+endloop.
+  if perio+4(2) lt '12'.
+    perio+4(2) = perio+4(2) + 1.
+  elseif perio+4(2) eq '12'.
+    perio+4(2) = '01'.
+    perio+0(4) = perio+0(4) + 1.
+  endif.
+endwhile.
+sort lt001 by cntppc descending perio descending aufnr ascending.
+DATA: LT_MAILSUBJECT     TYPE SODOCCHGI1.
+DATA: LT_MAILRECIPIENTS  TYPE STANDARD TABLE OF SOMLREC90 WITH HEADER LINE.
+DATA: LT_MAILTXT         TYPE STANDARD TABLE OF SOLI      WITH HEADER LINE.
+data: lt_mailparb        type standard table of soparbi1 with header line.
+* Recipients
+LT_MAILRECIPIENTS-REC_TYPE  = 'U'.
+LT_MAILRECIPIENTS-RECEIVER = '*******'.
+APPEND LT_MAILRECIPIENTS .CLEAR LT_MAILRECIPIENTS .
+* Subject.
+Concatenate 'Subject' '' "'CPZP correction Back-flush memory size checking for' perio90 'from sap'
+ into LT_MAILSUBJECT-OBJ_NAME.
+LT_MAILSUBJECT-OBJ_LANGU = SY-LANGU.
+Concatenate 'CPZP correction BF mem size for' perio90
+ into LT_MAILSUBJECT-OBJ_DESCR separated by ' '.
+lt_mailparb-name = 'SENDER'.
+lt_mailparb-value = 'Fisherdu.fromHMMASAP@hmmausa.com'.
+append lt_mailparb.
+* Mail Contents
+data: lc1 type c length 10.
+data: lp001 type p decimals 3.
+data: tab type c length 1 value %_HORIZONTAL_TAB.
+data: lvtabix type sy-tabix value 0.
+loop at lt001 into lwt001.
+  lvtabix = sy-tabix.
+  if lvtabix > 10. exit. endif.
+  shift lwt001-aufnr left deleting leading '0'.
+  if lvtabix = 1.
+    lp001 = ( 5 * lwt001-cntppc ) / ( 2 * 5000000 ).
+    lc1 = lp001.
+    concatenate 'PPC with MAX memory consumption is '
+     lwt001-aufnr ' at roughly size of ' lc1 'GB.'
+    into lt_mailtxt separated by ''.
+    append lt_mailtxt. clear lt_mailtxt.
+    lt_mailtxt = ''. append lt_mailtxt. clear lt_mailtxt.
+    lt_mailtxt = 'Detail:'. append lt_mailtxt. clear lt_mailtxt.
+  endif.
+  lc1 = lwt001-cntppc.
+  concatenate lwt001-aufnr lwt001-perio lc1
+    into lt_mailtxt
+    separated by tab
+"    separated by  cl_abap_char_utilities=>horizontal_tab.
+  .
+  append lt_mailtxt.
+  clear lt_mailtxt.
+endloop.
+lt_mailtxt = ''. append lt_mailtxt. clear lt_mailtxt.
+Concatenate 'Generated by system at' sy-datum
+  into lt_mailtxt separated by ' '.
+append lt_mailtxt. clear lt_mailtxt.
+LT_MAILTXT = 'Contacts: Fisher.du@hmmausa.com'.
+APPEND LT_MAILTXT. CLEAR LT_MAILTXT.
+LT_MAILTXT = 'Phone: 334-287-8209'.
+APPEND LT_MAILTXT. CLEAR LT_MAILTXT.
+LT_MAILTXT = ' '.
+APPEND LT_MAILTXT. CLEAR LT_MAILTXT.
+Concatenate 'If I did something wrong, event it was a small thing,'
+ 'I would want somebody to forgive me, so I forgive him'
+ 'for what he had done wrong because that''s the way of life.'
+ '--Lillian Rose Lee' into lt_mailtxt separated by space.
+ append lt_mailtxt. clear lt_mailtxt.
+" Send Mail
+CALL FUNCTION 'SO_NEW_DOCUMENT_SEND_API1'
+  EXPORTING
+    DOCUMENT_DATA              = LT_MAILSUBJECT
+  TABLES
+    OBJECT_CONTENT             = LT_MAILTXT
+"    object_parb                = lt_mailparb "Not success to use this specify sender
+    RECEIVERS                  = LT_MAILRECIPIENTS
+  EXCEPTIONS
+    TOO_MANY_RECEIVERS         = 1
+    DOCUMENT_NOT_SENT          = 2
+    DOCUMENT_TYPE_NOT_EXIST    = 3
+    OPERATION_NO_AUTHORIZATION = 4
+    PARAMETER_ERROR            = 5
+    X_ERROR                    = 6
+    ENQUEUE_ERROR              = 7
+  OTHERS                     = 8.
+IF SY-SUBRC EQ 0.
+ COMMIT WORK.
+"   Push mail out from SAP outbox
+ SUBMIT RSCONN01 WITH MODE = 'INT' AND RETURN.
+ write: / 'CPZP correction BF mem check Mail sent successfully to below receivers:'.
+ loop at LT_MAILRECIPIENTS.
+   write: / lt_mailrecipients-RECEIVER.
+ endloop.
+else.
+  write: / 'CPZP correction BF mem check Mail exception when sending to below recipients (one shot)'.
+  loop at LT_MAILRECIPIENTS.
+    write: / lt_mailrecipients-RECEIVER.
+  endloop.
+ENDIF.
+exit.
+if sy-batch = 'X'.
+    loop at lt001 into lwt001.
+      write: / lwt001-aufnr, lwt001-perio, lwt001-cntppc.
+    endloop.
+else.
+  call function 'GUI_DOWNLOAD'
+    exporting
+      filename = 'C:\temp\backflushnumberofrecords.xls'
+      filetype = 'ASC'
+      WRITE_FIELD_SEPARATOR = 'X'
+    tables
+      data_tab = lt001
+    exceptions
+      file_write_error = 1
+    others = 22
+    .
+  if sy-uname = 'HIS20166'. break-point. endif.
+endif.
+endform.
