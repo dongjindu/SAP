@@ -1,0 +1,373 @@
+"Actually in infoset
+"Data section
+TYPE-POOLS: slis.
+TABLES:   SRGBTBREL, bseg.
+TYPES: BEGIN OF ATTACH,
+  GJAHR TYPE BKPF-GJAHR,
+  BELNR TYPE BKPF-BELNR,
+  BUDAT TYPE BKPF-BUDAT,
+  BLDAT TYPE BKPF-BLDAT,
+  EBELN TYPE BSEG-EBELN,
+  LIFNR TYPE BSEG-LIFNR,
+  COUNTZ1 TYPE INTEGER,
+  NAME1 TYPE LFA1-NAME1,
+  MBLNR TYPE MKPF-MBLNR,
+  aWKEY TYPE BKPF-AWKEY,
+  blart type bkpf-blart,
+  usnam type bkpf-usnam,
+  kostl type bseg-kostl,
+  ifmcc type c length 1,
+END OF ATTACH.
+TYPES: BEGIN OF ATTACHACC,
+  GJAHR TYPE BKPF-GJAHR,
+  BELNR TYPE BKPF-BELNR,
+END OF ATTACHACC.
+types: begin of trefbo,
+  refbo type c length 30,
+end of trefbo.
+types: begin of trefbosr,
+  instid_A type srgbtbrel-instid_A,
+end of trefbosr.
+types: begin of trefboto,
+  object_id type toa01-object_id,
+end of trefboto.
+types: begin of tkostl,
+  kostl type bseg-kostl,
+end of tkostl.
+DATA:
+"      REFBO TYPE C LENGTH 30,
+      wa_trefbo type trefbo,
+      wa_trefbosr type trefbosr,
+      wa_trefboto type trefboto,
+      I_refbosr type standard table of trefbosr initial size 0,
+      I_refboto type standard table of trefboto initial size 0,
+      I_REFBO1 type standard table of trefbosr initial size 0,
+      I_REFBO2 type standard table of trefboto initial size 0,
+      I_kostl type standard table of tkostl initial size 0,
+      wa_kostl type tkostl,
+      S1 TYPE C LENGTH 10,
+      ZMESSAGE TYPE C LENGTH 30,
+      I TYPE SY-TABIX,
+      I1 TYPE SY-TABIX,
+      i2 type i,
+      WA_ATTACHACC TYPE ATTACHACC,
+      WA_ATTACH TYPE ATTACH,
+      I_ATTACHACC TYPE STANDARD TABLE OF ATTACHACC INITIAL SIZE 0,
+      I_ATTACH TYPE STANDARD TABLE OF ATTACH INITIAL SIZE 0,
+      I_ATTACH1 TYPE STANDARD TABLE OF ATTACH INITIAL SIZE 0,
+      I_FLDCAT TYPE slis_t_fieldcat_alv,
+      WA_FLDCAT TYPE slis_fieldcat_alv.
+data:      v_delete type i value 0,
+           v_modify type i value 0,
+           v_tabix type sy-tabix,
+           v_ebeln type bseg-ebeln,
+           v_kostl type bseg-kostl.
+select-options soblart for bkpf-blart no-display.
+FIELD-SYMBOLS <FS> LIKE LINE OF I_ATTACHACC.
+"Data initialization section
+PPBUKRS = 'H201'.
+soblart-sign = 'I'.
+soblart-option = 'EQ'.
+soblart-low = 'WE'.
+soblart-high = 'WE'.
+append soblart.
+soblart-sign = 'I'.
+soblart-option = 'EQ'.
+soblart-low = 'WF'.
+soblart-high = 'WF'.
+append soblart.
+soblart-sign = 'I'.
+soblart-option = 'EQ'.
+soblart-low = 'WG'.
+soblart-high = 'WG'.
+append soblart.
+soblart-sign = 'I'.
+soblart-option = 'EQ'.
+soblart-low = 'WI'.
+soblart-high = 'WI'.
+append soblart.
+soblart-sign = 'I'.
+soblart-option = 'EQ'.
+soblart-low = 'WN'.
+soblart-high = 'WN'.
+append soblart.
+"Start of selection section
+if ppmin < 0 or ppmax < 0.
+  message 'Min/Max Must be positive or zero' type 'E'.
+elseif ppmin > 0 and ppmax = 0.
+  ppmax = ppmin.
+endif.
+if ppbukrs = ''.
+  ppbukrs = 'H201'.
+endif.
+if ppmin > ppmax.
+  message 'Min must be less than or equal to Max' type 'E'.
+endif.
+"loop at pshkont.
+"  shift pshkont-low right deleting trailing space.
+"  overlay pshkont-low with '0000000000' only space.
+"  shift pshkont-high right deleting trailing space.
+"  overlay pshkont-high with '0000000000' only space.
+"  modify pshkont.
+"endloop.
+select belnr gjahr budat bldat AWKEY blart usnam from bkpf
+  into corresponding fields of table i_attach
+  where bukrs eq ppbukrs
+  and belnr in psbelnr and gjahr in psgjahr
+  and budat in psbudat
+  and bldat in psbldat
+  and blart in psblart
+  and awkey in psawkey
+  and usnam in psusnam.
+  if not pskostl is initial
+    or not pshkont is initial
+    or not pslifnr is initial
+    or not psebeln is initial.
+      loop at i_attach into wa_attach.
+        v_tabix = sy-tabix.
+        v_delete = 0.
+        if not pslifnr is initial or not psebeln is initial.
+        select single ebeln FROM bseg
+          into v_ebeln
+          where bukrs eq ppbukrs
+          and belnr eq wa_attach-belnr
+          and gjahr eq wa_attach-gjahr
+          and ebeln in psebeln
+"          and kostl in pskostl
+"          and hkont in pshkont
+          and lifnr in pslifnr.
+        v_delete = abs( sy-subrc ).
+        endif.
+        if not pskostl is initial.
+        select single ebeln FROM bseg
+          into v_ebeln
+          where bukrs eq ppbukrs
+          and belnr eq wa_attach-belnr
+          and gjahr eq wa_attach-gjahr
+"          and ebeln in psebeln
+          and kostl in pskostl.
+"          and hkont in pshkont
+"          and lifnr in pslifnr.
+        v_delete = v_delete + abs( sy-subrc ).
+        endif.
+        if sy-uname = 'HIS20166'. break-point. endif.
+        if not pshkont is initial.
+        select single ebeln FROM bseg
+          into v_ebeln
+          where bukrs eq ppbukrs
+          and belnr eq wa_attach-belnr
+          and gjahr eq wa_attach-gjahr
+"          and ebeln in psebeln
+"          and kostl in pskostl
+          and hkont in pshkont.
+"          and lifnr in pslifnr.
+        v_delete = v_delete + abs( sy-subrc ).
+        endif.
+        if v_delete NE 0.
+          delete i_attach index v_tabix.
+        endif.
+      endloop.
+  endif.
+refresh i_refbosr.
+refresh i_refboto.
+loop at i_attach into wa_attach.
+  wa_trefbosr-instid_a+0(4) = ppbukrs.
+  wa_trefbosr-instid_a+4(10) = wa_attach-belnr.
+  wa_trefbosr-instid_a+14(4) = wa_attach-gjahr.
+  append wa_trefbosr to i_refbosr.
+"  wa_trefbo-refbo+18(1) = '%'.
+  wa_trefboto-object_id+0(4) = ppbukrs.
+  wa_trefboto-object_id+4(10) = wa_attach-belnr.
+  wa_trefboto-object_id+14(4) = wa_attach-gjahr.
+  append wa_trefboto to i_refboto.
+  clear wa_trefbosr.
+  clear wa_trefboto.
+endloop.
+select INSTID_A
+  from srgbtbrel
+  INTO corresponding fields of table i_REFBO1
+  for all entries in i_refbosr
+  where reltype = 'ATTA' and typeid_a = 'BKPF'
+     and instid_A = i_refbosr-instid_A.
+select object_id
+   from toa01
+  into corresponding fields of table i_refbo2
+  for all entries in i_refboto
+  where SAP_OBJECT = 'BKPF'
+    and object_id = i_refboto-object_id.
+loop at i_refbo1 into wa_trefbosr.
+  move wa_trefbosr-instid_a+4(10) to wa_attachacc-belnr.
+  move wa_trefbosr-instid_a+14(4) to wa_attachacc-gjahr.
+  append wa_attachacc to i_attachacc.
+  clear wa_attachacc.
+endloop.
+refresh i_refbo1.
+loop at i_refbo2 into wa_trefboto.
+  move wa_trefboto-object_id+4(10) to wa_attachacc-belnr.
+  move wa_trefboto-object_id+14(4) to wa_attachacc-gjahr.
+  append wa_attachacc to i_attachacc.
+  clear wa_attachacc.
+endloop.
+refresh i_refbo2.
+clear: wa_attach.
+CLEAR: WA_ATTACHacc.
+SORT I_ATTACH BY gJAHR ascending BeLNR ascending.
+SORT I_ATTACHacc BY gJAHR ascending BeLNR ascending.
+DESCRIBE TABLE I_ATTACHacc LINES I1.
+I = 0. "Used to cntrol reading I_attachacc only. Nothing of i_attach!
+"BREAK-POINT.
+LOOP AT i_ATTACH INTO WA_ATTACH.
+  IF I = I1.
+    EXIT.
+  ENDIF.
+  WHILE I < I1.
+    i = i + 1.
+"    BREAK-POINT.
+    READ TABLE I_ATTACHacc ASSIGNING <FS> INDEX I.
+      IF WA_ATTACH-gJAHR = <FS>-gJAHR
+        AND WA_ATTACH-BeLNR = <FS>-BeLNR.
+        WA_ATTACH-COUNTZ1 = WA_ATTACH-COUNTZ1 + 1.
+        CONTINUE.
+      ELSEIF WA_ATTACH-GJAHR < <FS>-GJAHR
+        OR ( WA_ATTACH-GJAHR = <FS>-GJAHR
+        AND WA_ATTACH-BELNR < <FS>-BELNR ).
+        I = I - 1.
+        EXIT.
+      ELSE.
+        CONTINUE.
+      ENDIF.
+  ENDWHILE.
+"  S1 = WA_MATATTACH-COUNTZ1.
+"  CONCATENATE WA_MATATTACH-MBLNR WA_MATATTACH-MJAHR S1 INTO ZMESSAGE.
+"  MESSAGE ZMESSAGE TYPE 'S'.
+  modify i_attach from wa_attach.
+ENDLOOP.
+"if sy-uname = 'HIS20166'. break-point. endif.
+loop at I_attach into wa_attach.
+  if wa_attach-blart in soblart.
+    WA_ATTACH-MBLNR = WA_ATTACH-AWKEY+0(10).
+  endif.
+  IF WA_ATTACH-COUNTZ1 >= ppmin AND WA_ATTACH-COUNTZ1 <= ppmax.
+    APPEND WA_ATTACH TO I_ATTACH1.
+  ENDIF.
+endloop.
+free i_attach.
+LOOP AT I_ATTACH1 INTO WA_ATTACH.
+  v_tabix = sy-tabix.
+  SELECT SIngLE LIFNR EBELN
+    FROM BSEG
+    INTO (WA_ATTACH-LIFNR, WA_ATTACH-EBELN)
+    where bukrs = ppbukrs
+    and belnr = wa_attach-belnr
+    and gjahr = wa_attach-gjahr
+    AND ( LIFNR <> ''
+         OR EBELN <> '').
+  IF SY-SUBRC = 0.
+    SELECT SINGLE NAME1 INTO WA_ATTACH-NAME1
+      FROM LFA1 WHERE LIFNR = WA_ATTACH-LIFNR.
+    if sy-subrc = 0.
+      v_modify = v_modify + 1.
+    endif.
+  ENDIF.
+  i2 = 0.
+  select kostl
+    into corresponding fields of table i_kostl
+    "wa_attach-kostl
+    from bseg
+    where bukrs = ppbukrs
+      and belnr = wa_attach-belnr
+      and gjahr = wa_attach-gjahr
+      and kostl ne ''
+    .
+  sort i_kostl by kostl.
+  delete adjacent duplicates from i_kostl.
+  describe table i_kostl lines i2.
+  v_modify = v_modify + i2.
+  if i2 > 2.
+    wa_attach-ifmcc = 'X'.
+  endif.
+  loop at i_kostl into wa_kostl.
+    if sy-tabix = 1.
+      wa_attach-kostl = wa_kostl-kostl.
+      exit.
+    endif.
+  endloop.
+"  read table i_kostl index 1 transporting kostl
+"    into wa_attach-kostl.
+  if v_modify gt 0.
+    modify i_attach1 from wa_attach index v_tabix.
+  endif.
+ENDLOOP.
+"BREAK-POINT.
+WA_FLDCAT-COL_POS = 1.
+WA_FLDCAT-FIELDNAME = 'BELNR'.
+WA_FLDCAT-SELTEXT_L = 'ACC. Doc'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 2.
+WA_FLDCAT-FIELDNAME = 'GJAHR'.
+WA_FLDCAT-SELTEXT_L = 'ACC. Doc year'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 3.
+WA_FLDCAT-FIELDNAME = 'BUDAT'.
+WA_FLDCAT-SELTEXT_L = 'Posting date'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 4.
+WA_FLDCAT-FIELDNAME = 'BLDAT'.
+WA_FLDCAT-SELTEXT_L = 'Doc. Date'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 5.
+WA_FLDCAT-FIELDNAME = 'COUNTZ1'.
+WA_FLDCAT-SELTEXT_L = 'Att. cnt'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 6.
+WA_FLDCAT-FIELDNAME = 'MBLNR'.
+WA_FLDCAT-SELTEXT_L = 'GR NO'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 7.
+WA_FLDCAT-FIELDNAME = 'EBELN'.
+WA_FLDCAT-SELTEXT_L = 'PurOrd'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 8.
+WA_FLDCAT-FIELDNAME = 'LIFNR'.
+WA_FLDCAT-SELTEXT_L = 'Vendor'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 9.
+WA_FLDCAT-FIELDNAME = 'NAME1'.
+WA_FLDCAT-SELTEXT_L = 'Ven name'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 10.
+WA_FLDCAT-FIELDNAME = 'USNAM'.
+WA_FLDCAT-SELTEXT_L = 'User name'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 11.
+WA_FLDCAT-FIELDNAME = 'KOSTL'.
+WA_FLDCAT-SELTEXT_L = 'CCtr'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+WA_FLDCAT-COL_POS = 11.
+WA_FLDCAT-FIELDNAME = 'IFMCC'.
+WA_FLDCAT-SELTEXT_L = 'M CCtr'.
+append wa_fldcat to i_fldcat.
+clear wa_fldcat.
+Call fuNCtion 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      IT_FIELDCAT = I_FLDCAT
+    TABLES
+      T_OUTTAB = I_ATTACH1
+    EXCEPTIONS
+      PROGRAM_ERROR = 1
+      OTHERS = 2.
+IF SY-SUBRC <> 0.
+  MESSAGE id SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+ENDIF.
+EXIT.
