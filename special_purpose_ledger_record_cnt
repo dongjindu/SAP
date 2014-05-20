@@ -1,6 +1,7 @@
 perform sub1. 
 exit.
 form sub1.
+"Shall be further filtered by t881 where fix = space and depld = space and app = 'FI' and subappl = 'SL'. 
   types: begin of tt000,
 "    include structure t800a.
     tab type t800a-tab,
