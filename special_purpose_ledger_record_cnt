@@ -41,7 +41,8 @@ form sub1.
       INTO LT000-LEDGERFIELD
       FROM DD03L AS L
       WHERE L~TABNAME = LT000-TAB
-        AND L~rollNAME = 'RLDNR'
+        AND ( L~rollNAME like '%RLDNR%'
+        or l~rollname like '%LEDNR%' )
         AND L~AS4LOCAL = 'A'
         .
     IF SY-SUBRC <> 0. CLEAR LT000-LEDGERFIELD. ENDIF.
@@ -71,13 +72,15 @@ form sub1.
     SEPARATED BY SPACE.
     APPEND CONDTAB.
     CHECK LT001-LEDGERFIELD <> ''.
-    GROUPFIELDLIST = LT001-LEDGERFIELD && ' COUNT(*) AS CNT'.
+    concatenate LT001-LEDGERFIELD 'COUNT(*) AS CNT'
+      into groupfieldlist separated by space.
 "  if sy-uname = 'HIS20166'. break-point. endif.
     select (GROUPFIELDLIST)
       from (lt001-tab)
       into (lt001-rldnr,  lt001-cnt)
       where (CONDTAB) "Field of client, e.g., rclnt = '300'
-      group by (LT001-LEDGERFIELD).
+      group by (LT001-LEDGERFIELD)
+      .
       append lt001.
     endselect.
   endloop.
