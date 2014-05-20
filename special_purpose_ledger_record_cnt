@@ -1,0 +1,87 @@
+perform sub1. 
+exit.
+form sub1.
+  types: begin of tt000,
+"    include structure t800a.
+    tab type t800a-tab,
+    MANDTFIELD TYPE DD03L-FIELDNAME,
+    LEDGERFIELD TYPE DD03L-FIELDNAME,
+    tabclass type dd02l-tabclass,
+    cnt type i.
+  types: end of tt000.
+  types: begin of tt001,
+    tab type t800a-tab,
+    MANDTFIELD TYPE DD03L-FIELDNAME,
+    LEDGERFIELD TYPE DD03L-FIELDNAME,
+    rldnr type glfunca-rldnr,
+    cnt type i.
+  types: end of tt001.
+  data: lt000 type standard table of tt000 with header line.
+  data: lt001 type standard table of tt001 with header line.
+  data: li0 type i.
+  select a~tab d~tabclass L~FIELDNAME AS MANDTFIELD
+    into corresponding fields of lt000
+    from t800a as a
+       inner join dd02l as d
+        on a~tab = d~tabname
+       INNER JOIN DD03L AS L
+        ON A~TAB = L~TABNAME
+         AND D~AS4LOCAL = L~AS4LOCAL
+         AND D~AS4VERS = L~AS4VERS
+    where  "D~TABCLASS <> 'INTTAB' and  "Append also?
+     d~as4local = 'A'
+    AND L~ROLLNAME = 'MANDT'
+     " OR L~ROLLNAME = 'RLDNR' )
+    " ttype eq 'SI' and
+"    tab <>  'GLS1' and
+"    tab <> 'GLS2'  and
+"    tab <> 'GLSPC'
+    .
+    SELECT SINGLE L~FIELDNAME AS LEDGERFIELD
+      INTO LT000-LEDGERFIELD
+      FROM DD03L AS L
+      WHERE L~TABNAME = LT000-TAB
+        AND L~rollNAME = 'RLDNR'
+        AND L~AS4LOCAL = 'A'
+        .
+    IF SY-SUBRC <> 0. CLEAR LT000-LEDGERFIELD. ENDIF.
+    APPEND LT000.
+  ENDSELECT.
+  data: begin of condtab ocCurs 0 ,
+        cond_line(60) type c ,
+      end of condtab .
+  if sy-uname = '*'. break-point. endif.
+  DATA: GROUPFIELDLIST TYPE STRING.
+  loop at lt000. "where tabclass <> 'INTTAB'.
+    li0 = sy-tabix.
+    check LT000-tabclass <> 'INTTAB'.
+    check lt000-tabCLASS <> 'POOL'.
+    check lt000-tabCLASS <> 'CLUSTER'.
+    clear lt000-cnt. clear lt001. REFRESH CONDTAB. CLEAR CONDTAB.
+    select count(*) as cnt from (lt000-tab)
+      into lt000-cnt
+      .
+    check lt000-cnt > 0.
+    modify lt000 index li0.
+    lt001-tab = lt000-tab.
+    LT001-MANDTFIELD = LT000-MANDTFIELD.
+    LT001-LEDGERFIELD = LT000-LEDGERFIELD.
+    CONCATENATE LT001-MANDTFIELD '= 300'
+    INTO CONDTAB-COND_LINE
+    SEPARATED BY SPACE.
+    APPEND CONDTAB.
+    CHECK LT001-LEDGERFIELD <> ''.
+    GROUPFIELDLIST = LT001-LEDGERFIELD && ' COUNT(*) AS CNT'.
+"  if sy-uname = 'HIS20166'. break-point. endif.
+    select (GROUPFIELDLIST)
+      from (lt001-tab)
+      into (lt001-rldnr,  lt001-cnt)
+      where (CONDTAB) "Field of client, e.g., rclnt = '300'
+      group by (LT001-LEDGERFIELD).
+      append lt001.
+    endselect.
+  endloop.
+  sort lt000 by cnt descending tab ascending.
+  sort lt001 by tab ascending rldnr ascending cnt descending.
+  if sy-uname = '*'. break-point. endif.
+endform.
