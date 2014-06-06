@@ -19,7 +19,7 @@ TYPES: BEGIN OF ATTACH,
   ifmcc type c length 1,
 END OF ATTACH.
 TYPES: BEGIN OF ATTACHACC,
-  GJAHR TYPE BKPF-GJAHR,
+  GJAHR TYPE BKPF-GJAHR ,
   BELNR TYPE BKPF-BELNR,
 END OF ATTACHACC.
 types: begin of trefbo,
@@ -46,6 +46,8 @@ DATA:
       I_kostl type standard table of tkostl initial size 0,
       wa_kostl type tkostl,
       S1 TYPE C LENGTH 10,
+      g_smbln type mkpf-mblnr,
+      g_sjahr type mkpf-mjahr,
       ZMESSAGE TYPE C LENGTH 30,
       I TYPE SY-TABIX,
       I1 TYPE SY-TABIX,
@@ -64,8 +66,9 @@ data:      v_delete type i value 0,
            v_kostl type bseg-kostl.
 select-options soblart for bkpf-blart no-display.
 FIELD-SYMBOLS <FS> LIKE LINE OF I_ATTACHACC.
+
 "Data initialization section
-PPBUKRS = 'H201'.
+PPBUKRS = '****'.
 soblart-sign = 'I'.
 soblart-option = 'EQ'.
 soblart-low = 'WE'.
@@ -91,6 +94,12 @@ soblart-option = 'EQ'.
 soblart-low = 'WN'.
 soblart-high = 'WN'.
 append soblart.
+psxrev-sign = 'I'.
+psxrev-option = 'EQ'.
+psxrev-low = ''.
+psxrev-high = ''.
+append psxrev.
+
 "Start of selection section
 if ppmin < 0 or ppmax < 0.
   message 'Min/Max Must be positive or zero' type 'E'.
@@ -118,7 +127,8 @@ select belnr gjahr budat bldat AWKEY blart usnam from bkpf
   and bldat in psbldat
   and blart in psblart
   and awkey in psawkey
-  and usnam in psusnam.
+  and usnam in psusnam
+  and xreversal in psxrev.
   if not pskostl is initial
     or not pshkont is initial
     or not pslifnr is initial
@@ -127,43 +137,46 @@ select belnr gjahr budat bldat AWKEY blart usnam from bkpf
         v_tabix = sy-tabix.
         v_delete = 0.
         if not pslifnr is initial or not psebeln is initial.
-        select single ebeln FROM bseg
-          into v_ebeln
-          where bukrs eq ppbukrs
-          and belnr eq wa_attach-belnr
-          and gjahr eq wa_attach-gjahr
-          and ebeln in psebeln
+          select single ebeln FROM bseg
+            into v_ebeln
+            where bukrs eq ppbukrs
+            and belnr eq wa_attach-belnr
+            and gjahr eq wa_attach-gjahr
+            and ebeln in psebeln
+            and ebeln ne ''
 "          and kostl in pskostl
 "          and hkont in pshkont
-          and lifnr in pslifnr.
-        v_delete = abs( sy-subrc ).
+            and lifnr in pslifnr
+            and lifnr ne ''
+            .
+          v_delete = abs( sy-subrc ).
         endif.
         if not pskostl is initial.
-        select single ebeln FROM bseg
-          into v_ebeln
-          where bukrs eq ppbukrs
-          and belnr eq wa_attach-belnr
-          and gjahr eq wa_attach-gjahr
-"          and ebeln in psebeln
-          and kostl in pskostl.
-"          and hkont in pshkont
-"          and lifnr in pslifnr.
-        v_delete = v_delete + abs( sy-subrc ).
+          select single ebeln FROM bseg
+            into v_ebeln
+            where bukrs eq ppbukrs
+            and belnr eq wa_attach-belnr
+            and gjahr eq wa_attach-gjahr
+"           and ebeln in psebeln
+            and kostl in pskostl.
+"           and hkont in pshkont
+"           and lifnr in pslifnr.
+          v_delete = v_delete + abs( sy-subrc ).
         endif.
-        if sy-uname = 'HIS20166'. break-point. endif.
+"        if sy-uname = '***'. break-point. endif.
         if not pshkont is initial.
-        select single ebeln FROM bseg
-          into v_ebeln
-          where bukrs eq ppbukrs
-          and belnr eq wa_attach-belnr
-          and gjahr eq wa_attach-gjahr
-"          and ebeln in psebeln
-"          and kostl in pskostl
-          and hkont in pshkont.
+          select single ebeln FROM bseg
+            into v_ebeln
+            where bukrs eq ppbukrs
+            and belnr eq wa_attach-belnr
+            and gjahr eq wa_attach-gjahr
+"           and ebeln in psebeln
+"           and kostl in pskostl
+            and hkont in pshkont.
 "          and lifnr in pslifnr.
-        v_delete = v_delete + abs( sy-subrc ).
+          v_delete = v_delete + abs( sy-subrc ).
         endif.
-        if v_delete NE 0.
+        if v_delete > 0.
           delete i_attach index v_tabix.
         endif.
       endloop.
@@ -242,10 +255,43 @@ LOOP AT i_ATTACH INTO WA_ATTACH.
 "  MESSAGE ZMESSAGE TYPE 'S'.
   modify i_attach from wa_attach.
 ENDLOOP.
-"if sy-uname = 'HIS20166'. break-point. endif.
+data: l_bwart type mseg-bwart.
+data: l_bwart1 type mseg-bwart.
+if sy-uname = '***'. break-point. endif.
 loop at I_attach into wa_attach.
-  if wa_attach-blart in soblart.
+  if wa_attach-blart in soblart. "Only WA/WE etc, it is linked with Mat doc number
     WA_ATTACH-MBLNR = WA_ATTACH-AWKEY+0(10).
+       if '' in psxrev
+         and '1' not in psxrev
+         and '2' not in psxrev.
+"         -sign = 'I'
+"         and psxrev-option = 'EQ'
+"         and psxrev-low = ''
+"         and psxrev-high.
+          g_smbln = wa_attach-awkey+0(10).
+          g_sjahr = wa_attach-awkey+10(4).
+          select single bwart into l_bwart
+            from mseg
+            where mblnr = wa_attach-mblnr
+              and mjahr = wa_attach-awkey+10(4)
+              and ( bwart = '101' or bwart = '131'
+                or bwart = '102' or bwart = '132')
+            .
+          if sy-subrc = 0 and ( l_bwart = '102' or l_bwart = '132' ).
+            continue.
+          elseif sy-subrc = 0 and ( l_bwart = '101' or l_bwart = '131' ).
+            select single bwart into l_bwart1
+              from mseg
+              where smbln = wa_attach-mblnr
+                and sjahr = wa_attach-awkey+10(4)
+                and ( bwart = '102' or bwart = '132' )
+               %_HINTS ORACLE 'INDEX("MSEG" "MSEG~S")'
+              .
+            if sy-subrc = 0.
+              continue.
+            endif.
+          endif.
+       endif.
   endif.
   IF WA_ATTACH-COUNTZ1 >= ppmin AND WA_ATTACH-COUNTZ1 <= ppmax.
     APPEND WA_ATTACH TO I_ATTACH1.
