@@ -1,0 +1,523 @@
+
+Private Sub mainsub()
+    Dim k1, k2, k3 As Long
+    Dim ss1 As String
+    Dim ss2 As String
+    Dim ss3 As String
+    Dim pre As String
+    
+    k1 = 120
+    k2 = 100
+    k3 = 300
+  
+  Dim xlFileFormat1 As Integer
+  xlFileFormat1 = xlTextWindows
+  
+  Dim ax As Excel.Application
+  Set ax = CreateObject("Excel.Application")
+   
+    ss1 = "Production OT Table"
+    ss2 = "7 Min rule Table"
+    ss3 = "Punch Record Data Table"
+    pre = ""
+'    Call DumpData(k1, k2, k3, ss1, ss2, ss3, ax, pre, xlFileFormat1)
+
+    k1 = 10
+    k2 = 10
+    k3 = 20
+    pre = "Small" & CStr(xlFileFormat1) & " "
+    Call DumpData(k1, k2, k3, ss1, ss2, ss3, ax, pre, xlFileFormat1)
+    ax.Quit
+    
+End Sub
+Public Sub DumpData(ByVal times1 As Long, ByVal times2 As Long, ByVal times3 As Long, _
+                  ByVal ws1 As String, ByVal ws2 As String, ByVal ws3 As String, AppExcel As Variant, prefix As String, _
+                  xlFileFormat As Integer)
+
+Dim SourcePath1 As String
+Dim dfns As Variant 'Data File Names
+
+Dim exWb As Object
+Dim maxfor As Integer
+
+Dim s1, s2, s3 As String
+Dim fntxt1, fntxt2, fntxt3 As String
+Dim st As String
+st = "@"
+
+  dfns = Array("106 OTS table information and sample format test 97-2003.xls")
+  SourcePath1 = "C:\Users\HIS20166\Desktop\hmma\fs\"
+  sourcepath2 = "C:\Users\HIS20166\Desktop\hmma\testing\106\"
+  
+'  ws1 = "Production OT Table"
+'  ws2 = "7 Min Rule Table"
+'  ws3 = "Punch Record Data Table"
+  maxfor = 99
+'  xlUnicodeText = 42
+' xlTextWindows = 20
+' xlTextPrinter = 36
+' xlTextMSDOS = 21
+  
+  For Index = 0 To UBound(dfns)
+    On Error Resume Next
+      Set exWb = GetObject(SourcePath1 & dfns(Index))
+    On Error GoTo 0
+    If exWb Is Nothing Then
+       Set exWb = AppExcel.Workbooks.Open(SourcePath1 & dfns(Index))
+    End If
+    With exWb.Worksheets(ws1)
+       .Activate
+       For i1 = 1 To maxfor
+         s1 = .Cells(i1, 1).Value
+         If Len(s1) < 2 Then
+           i2 = i1 + 50
+'           For i2 = 1 To 50
+'              MsgBox Cells(i1, 1).Value & "--" & Cells(i2, 2).Value
+'              .Cells(i1, 1).EntireRow.Delete
+'           Next
+           .Rows(CStr(i1) & ":" & CStr(i2)).Select
+           Selection.Delete
+           Exit For
+         End If
+       Next
+       i3 = 0
+       For i1 = 1 To times1
+          For i2 = 2 To 10
+            If i3 = 78 Then 'Duplicate records
+              i3 = i3 + 1
+              .Cells(i2, 1).EntireRow.Copy .Cells(i3, 1)
+            End If 'End of Duplicate records
+            i3 = i3 + 1
+            .Cells(i2, 1).EntireRow.Copy .Cells(i3, 1)
+            .Cells(i3, 5).Value = .Cells(i2, 5).Value + i1
+          Next
+       Next
+       i3 = i3 + 1 'Duplicate records
+       Cells(i2, 1).EntireRow.Copy .Cells(i3, 1) 'End of Duplicate records
+       .Columns("A").NumberFormat = "mm/dd/yyyy"
+       .Columns("E").NumberFormat = "00000000"
+       .Columns("F").NumberFormat = st
+       .Columns("J").NumberFormat = st
+       fntxt1 = sourcepath2 & prefix & ws1 & ".txt"
+      .SaveAs fntxt1, xlFileFormat
+    End With
+    exWb.Saved = True
+    exWb.Close SaveChanges:=False
+    On Error Resume Next
+      Set exWb = GetObject(SourcePath1 & dfns(Index))
+    On Error GoTo 0
+    If exWb Is Nothing Then
+       Set exWb = AppExcel.Workbooks.Open(SourcePath1 & dfns(Index))
+    End If
+    
+    
+    With exWb.Worksheets(ws2)
+       .Activate
+       For i1 = 1 To maxfor
+         s1 = .Cells(i1, 1).Value
+         If Len(s1) < 2 Then
+           i2 = i1 + 50
+'           For i2 = 1 To 50
+'              MsgBox Cells(i1, 1).Value & "--" & Cells(i2, 2).Value
+'              .Cells(i1, 1).EntireRow.Delete
+'           Next
+           .Rows(CStr(i1) & ":" & CStr(i2)).Select
+           Selection.Delete
+           Exit For
+         End If
+       Next
+       .Columns("D").NumberFormat = "mm/dd/yyyy"
+       .Columns("H").NumberFormat = "00000000"
+       .Columns("I").NumberFormat = st
+       .Columns("O").NumberFormat = "hh:mm:ss"
+       .Columns("P").NumberFormat = "hh:mm:ss"
+       .Columns("Q").NumberFormat = "hh:mm:ss"
+       .Columns("R").NumberFormat = "hh:mm:ss"
+       .Columns("S").NumberFormat = "hh:mm:ss"
+       .Columns("W").NumberFormat = "hh:mm:ss"
+       .Columns("X").NumberFormat = "hh:mm:ss"
+       .Columns("Y").NumberFormat = "hh:mm:ss"
+       i3 = 0
+       For i1 = 1 To times2
+          For i2 = 2 To 11
+            If i3 = 7800 Then 'Duplicate records
+              i3 = i3 + 1
+              .Cells(i2, 1).EntireRow.Copy .Cells(i3, 1)
+            End If 'End of Duplicate records
+            i3 = i3 + 1
+            .Cells(i2, 1).EntireRow.Copy .Cells(i3, 1)
+            .Cells(i3, 8).Value = .Cells(i2, 8).Value + i1
+          Next
+       Next
+       fntxt2 = sourcepath2 & prefix & ws2 & ".txt"
+       .SaveAs fntxt2, xlFileFormat
+    End With
+    exWb.Saved = True
+    exWb.Close SaveChanges:=False
+    On Error Resume Next
+      Set exWb = GetObject(SourcePath1 & dfns(Index))
+    On Error GoTo 0
+    If exWb Is Nothing Then
+       Set exWb = AppExcel.Workbooks.Open(SourcePath1 & dfns(Index))
+    End If
+    
+    With exWb.Worksheets(ws3)
+       .Activate
+       For i1 = 1 To maxfor
+         s1 = .Cells(i1, 1).Value
+         If Len(s1) < 2 Then
+           For i2 = 1 To 50
+              .Cells(i1, 1).EntireRow.Delete
+           Next
+'           .Rows(CStr(i1) & ":" & CStr(i2)).Select
+'           Selection.Delete
+           Exit For
+         End If
+       Next
+       .Columns("C").NumberFormat = "00000000"
+       .Columns("E").NumberFormat = "mm/dd/yyyy"
+       .Columns("F").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("G").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("H").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("I").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("J").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("K").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("L").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("M").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("N").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("O").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("P").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("Q").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       i3 = 0
+       For i1 = 1 To times3
+          For i2 = 2 To 2
+            If i3 = 7800 Then 'Duplicate records
+              i3 = i3 + 1
+              .Cells(i2, 1).EntireRow.Copy .Cells(i3, 1)
+            End If 'End of Duplicate records
+            i3 = i3 + 1
+            .Cells(i2, 1).EntireRow.Copy .Cells(i3, 1)
+            .Cells(i3, 3).Value = .Cells(i2, 3).Value + i1
+          Next
+       Next
+       fntxt3 = sourcepath2 & prefix & ws3 & ".txt"
+      .SaveAs fntxt3, xlFileFormat
+    End With
+    exWb.Saved = True
+    exWb.Close SaveChanges:=False
+    On Error Resume Next
+      Set exWb = GetObject(SourcePath1 & dfns(Index))
+    On Error GoTo 0
+    If exWb Is Nothing Then
+       Set exWb = AppExcel.Workbooks.Open(SourcePath1 & dfns(Index))
+    End If
+ Next
+ On Error Resume Next
+ exWb.Close SaveChanges:=False
+ 
+ Call replaceDoublequote(fntxt1, prefix)
+ Call replaceDoublequote(fntxt2, prefix)
+ Call replaceDoublequote(fntxt3, prefix)
+ SetAttr fntxt1, vbNormal
+ 'Kill fntxt1
+ SetAttr fntxt2, vbNormal
+ 'Kill fntxt2
+ SetAttr fntxt3, vbNormal
+ 'Kill fntxt3
+End Sub
+Public Sub replaceDoublequote(ByVal fn As String, prefix As String)
+   Dim vs1(0 To 200000) As String
+   Dim inx As Long
+   
+   Dim s1, s2 As String
+   
+'   Dim fna As Variant
+   Dim fnZzz As String
+   fna = Split(fn, "\")
+   fnZzz = replace(fn, "Prefix", prefix & "Double quotes removed")
+   
+   Close
+   Dim nextInFile As Integer
+   Dim nextOutFile As Integer
+   
+   nextInFile = 1
+   nextOutFile = 2
+   Open fn For Input As #nextInFile
+   
+   inx = 0
+   Do While Not EOF(1)
+       Line Input #nextInFile, s1
+       s1 = replace(s1, Chr(34), "")
+ '      s2 = s2 & s1
+       vs1(inx) = s1
+       inx = inx + 1
+   Loop
+   
+   Open fnZzz For Output As #nextOutFile
+   For ind = LBound(vs1) To inx - 1
+       Print #nextOutFile, vs1(ind)
+   Next
+'   Print #nextOutFile, s2
+   Close #nextInFile
+   Close #nextOutFile
+End Sub
+
+Private Sub mainsub1()
+    Dim k1, k2, k3 As Long
+    Dim ss1 As String
+    Dim ss2 As String
+    Dim ss3 As String
+    Dim pre As String
+    
+    k1 = 120
+    k2 = 100
+    k3 = 300
+  
+  Dim xlFileFormat1 As Integer
+  xlFileFormat1 = xlTextWindows
+  
+    ss1 = "Production OT Table"
+    ss2 = "7 Min rule Table"
+    ss3 = "Punch Record Data Table"
+  
+  Dim ax As Excel.Application
+  Set ax = CreateObject("Excel.Application")
+   
+    k1 = 10
+    k2 = 10
+    k3 = 20
+    pre = "Small " & CStr(xlFileFormat1) & " "
+    Call DumpData1(k1, k2, k3, ss1, ss2, ss3, ax, pre, xlFileFormat1)
+    ax.Quit
+End Sub
+Public Sub DumpData1(ByVal times1 As Long, ByVal times2 As Long, ByVal times3 As Long, _
+                  ByVal ws1 As String, ByVal ws2 As String, ByVal ws3 As String, AppExcel As Variant, prefix As String, _
+                  xlFileFormat As Integer)
+Dim SourcePath1 As String
+Dim dfns As Variant 'Data File Names
+
+Dim exWb As Workbook
+Dim wsh As Worksheet
+Dim maxfor As Integer
+Dim cnt As Integer
+Dim i0, i1 As Integer
+
+Dim s1, s2, s3 As String
+Dim fntxt1, fntxt2, fntxt3 As String
+Dim st As String
+st = "@"
+  dfns = Array("Punch Data - May and June", "Manhour Data - May", "Manhour Data - June", "7 Minute Data - May and June")
+  dpostFix = ".xlsx"
+  SourcePath1 = "C:\Users\HIS20166\Desktop\hmma\testing\106\realdatatesting\"
+  sourcepath2 = "C:\Users\HIS20166\Desktop\hmma\testing\106\realdatatesting\txt\"
+'  ws1 = "Production OT Table"
+'  ws2 = "7 Min Rule Table"
+'  ws3 = "Punch Record Data Table"
+  maxfor = 99
+' xlUnicodeText = 42
+' xlTextWindows = 20
+' xlTextPrinter = 36
+' xlTextMSDOS = 21
+  
+  For Index = 0 To UBound(dfns)
+    On Error Resume Next
+      Set exWb = GetObject(SourcePath1 & dfns(Index) & dpostFix)
+    On Error GoTo 0
+    If exWb Is Nothing Then
+       Set exWb = AppExcel.Workbooks.Open(SourcePath1 & dfns(Index) & dpostFix)
+    End If
+    exWb.Activate
+    cnt = 0
+    For Each wsh In exWb.Worksheets
+        cnt = cnt + 1
+        If Len(wsh.Cells(1, 1).Value) < 1 Then
+            Exit For
+        End If
+    Next
+    i0 = 0
+    For Each wsh In exWb.Worksheets
+        i0 = i0 + 1
+        If i0 > cnt Then
+            Exit For
+        End If
+           wsh.Activate
+           'MsgBox "Testing" & wsh.Cells(1, 1).Value
+           If wsh.Cells(1, 1).Value = "Date" And wsh.Cells(1, 2).Value = "Year" Then
+               ws = ws1 'Production OT table
+               'MsgBox dfns(Index) & ".xlsx ~~ " & wsh.Name
+               Call format1(wsh, sourcepath2, prefix & dfns(Index), xlFileFormat)
+           ElseIf wsh.Cells(1, 1).Value = "Year" And wsh.Cells(1, 2).Value = "Month" Then
+               ws = ws2 '7 Min rule table
+'               Call format2(wsh, sourcepath2, prefix & dfns(Index), xlFileFormat)
+           ElseIf wsh.Cells(1, 1).Value = "TM NUM" Then
+               ws = ws3 'Punch record data table
+'               Call format3(wsh, sourcepath2, prefix & dfns(Index), xlFileFormat)
+           End If
+    Next
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    exWb.Close SaveChanges:=False
+    Application.DisplayAlerts = True
+  Next
+  MsgBox "Processing finished with text file generated!"
+End Sub
+
+Public Sub format1(ByVal wsh As Worksheet, ByVal sourcepath2 As String, ByVal prefix As String, ByVal fileformat As Integer)
+Dim maxfor As Integer
+maxfor = 99 'Total non-data rows after data area
+Dim i1, i2, i3 As Long
+Dim fntxt1 As String
+Dim st As String
+Dim s999 As String
+Dim rng As Range
+
+st = "@"
+
+    With wsh
+       .Activate
+       For i1 = 1 To maxfor
+         s1 = .Cells(i1, 1).Value
+         If Len(s1) < 2 Then
+           i2 = i1 + 50
+'           For i2 = 1 To 50
+'              MsgBox Cells(i1, 1).Value & "--" & Cells(i2, 2).Value
+'              .Cells(i1, 1).EntireRow.Delete
+'           Next
+           .Rows(CStr(i1) & ":" & CStr(i2)).Select
+           Selection.Delete
+           Exit For
+         End If
+       Next
+       
+       .Columns("A").NumberFormat = "mm/dd/yyyy"
+       .Columns("B").NumberFormat = st
+       .Columns("C").NumberFormat = st
+       .Columns("D").NumberFormat = st
+       .Columns("E").NumberFormat = "00000000"
+       .Columns("F").NumberFormat = st
+       .Columns("G").NumberFormat = st
+       .Columns("H").NumberFormat = st
+       .Columns("I").NumberFormat = st
+       .Columns("J").NumberFormat = st
+       .Columns("K").NumberFormat = st
+       .Columns("L").NumberFormat = st
+       .Columns("M").NumberFormat = st
+       .Columns("N").NumberFormat = st
+       fntxt1 = sourcepath2 & prefix & " " & .Name & ".txt"
+'       fntxt1 = sourcepath2 & .Name & ".txt"
+'      .SaveAs fntxt1, fileformat
+    'End With
+    Dim nextOutFile As Integer
+    nextOutFile = 1
+    Open fntxt1 For Output As #nextOutFile
+       Dim ind As Long 'Row
+       Dim inx As Long 'Column
+       Dim s998 As String
+    'With wsh
+       For ind = 2 To 300
+           If Len(Format(.Cells(ind, 1).Value)) < 2 Then
+               Exit For
+           End If
+           s998 = ""
+           For inx = 1 To 21
+               If inx > 1 Then
+                   s998 = s998 & Chr(9) & Format(.Cells(ind, inx).Value, .Cells(ind, inx).NumberFormat)
+               ElseIf inx = 1 Then
+                   s998 = s998 & Format(.Cells(ind, inx).Value, .Cells(ind, inx).NumberFormat)
+               End If
+           Next
+           Print #nextOutFile, s998
+        Next
+'   Print #nextOutFile, s2
+     End With
+     Close #nextOutFile
+
+'    Call replaceDoublequote(fntxt1, prefix)
+End Sub
+Public Sub format2(ByVal wsh As Worksheet, ByVal sourcepath2 As String, ByVal prefix As String, ByVal fileformat As Integer)
+Dim maxfor As Integer
+maxfor = 99 'Total non-data rows after data area
+Dim i1, i2, i3 As Integer
+Dim fntxt2 As String
+Dim st As String
+st = "@"
+
+    With .wsh
+       .Activate
+       For i1 = 1 To maxfor
+         s1 = .Cells(i1, 1).Value
+         If Len(s1) < 2 Then
+           i2 = i1 + 50
+'           For i2 = 1 To 50
+'              MsgBox Cells(i1, 1).Value & "--" & Cells(i2, 2).Value
+'              .Cells(i1, 1).EntireRow.Delete
+'           Next
+           .Rows(CStr(i1) & ":" & CStr(i2)).Select
+           Selection.Delete
+           Exit For
+         End If
+       Next
+
+       .Columns("D").NumberFormat = "mm/dd/yyyy"
+       .Columns("H").NumberFormat = "00000000"
+       .Columns("I").NumberFormat = st
+       .Columns("O").NumberFormat = "hh:mm:ss"
+       .Columns("P").NumberFormat = "hh:mm:ss"
+       .Columns("Q").NumberFormat = "hh:mm:ss"
+       .Columns("R").NumberFormat = "hh:mm:ss"
+       .Columns("S").NumberFormat = "hh:mm:ss"
+       .Columns("W").NumberFormat = "hh:mm:ss"
+       .Columns("X").NumberFormat = "hh:mm:ss"
+       .Columns("Y").NumberFormat = "hh:mm:ss"
+       fntxt2 = sourcepath2 & prefix & ws1 & ".txt"
+      .SaveAs fntxt2, fileformat
+    End With
+    Call replaceDoublequote(fntxt2, prefix)
+End Sub
+Public Sub format3(ByVal wsh As Worksheet, ByVal sourcepath2 As String, ByVal prefix As String, ByVal fileformat As Integer)
+Dim maxfor As Integer
+maxfor = 99 'Total non-data rows after data area
+Dim i1, i2, i3, i4 As Integer
+Dim fntxt3 As String
+Dim st As String
+st = "@"
+
+    With wsh
+       .Activate
+       For i1 = 1 To maxfor
+         s1 = .Cells(i1, 1).Value
+         If Len(s1) < 2 Then
+           i2 = i1 + 50
+'           For i2 = 1 To 50
+'              MsgBox Cells(i1, 1).Value & "--" & Cells(i2, 2).Value
+'              .Cells(i1, 1).EntireRow.Delete
+'           Next
+           .Rows(CStr(i1) & ":" & CStr(i2)).Select
+           Selection.Delete
+           Exit For
+         End If
+       Next
+       
+       .Columns("C").NumberFormat = "00000000"
+       .Columns("E").NumberFormat = "mm/dd/yyyy"
+       .Columns("F").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("G").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("H").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("I").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("J").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("K").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("L").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("M").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("N").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("O").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("P").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       .Columns("Q").NumberFormat = "mm/dd/yyyy hh:mm:ss"
+       fntxt3 = sourcepath2 & prefix & .Name & ".txt"
+      .SaveAs fntxt3, fileformat
+    End With
+    Call replaceDoublequote(fntxt3, prefix)
+End Sub
+
+
+
+
