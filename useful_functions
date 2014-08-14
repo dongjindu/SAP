@@ -1,2 +1,38 @@
-*: se16n_interface 
+==se16n_interface ==
 Set break-point. Change i_edit, i_sapedit to X then table entry is going to be editable.
+==GET_COMPONENT_LIST==
+GET THE NAMES OF COMPONENTS OF INTERNAL TABLE.
+===Alternative 1===
+Can also be achieved by below statement
+ASSIGN LINE TO <F1>.
+ASSIGN COMPONENT SY-INDEX OF STRUCTURE <F1> TO <F2>.
+===Alternative 2===
+TYPES: BEGIN OF typ_itab,
+         aaa(20) TYPE c,
+         bbb TYPE i,
+         ccc TYPE p LENGTH 12 DECIMALS 3,
+          END OF typ_itab.
+DATA: i_itab TYPE TABLE OF typ_itab,
+      l_tabledescr_ref TYPE REF TO cl_abap_tabledescr,
+      l_descr_ref      TYPE REF TO cl_abap_structdescr,
+      wa_table TYPE abap_compdescr.
+
+l_tabledescr_ref ?= cl_abap_typedescr=>describe_by_data( i_itab ).
+l_descr_ref ?= l_tabledescr_ref->get_table_line_type( ).
+
+LOOP AT l_descr_ref->components INTO wa_table .
+  WRITE: / wa_table-name,wa_table-type_kind,
+         wa_table-length,wa_table-decimals.
+ENDLOOP.
+===Alternative 3===
+dynamic table
+CALL METHOD cl_alv_table_create=>create_dynamic_table
+EXPORTING
+i_style_table             = 'X'
+it_fieldcatalog           = gt_dyn_fcat
+IMPORTING
+ep_table                  = gt_dyn_table
+EXCEPTIONS
+generate_subpool_dir_full = 1
+OTHERS                    = 2.
+check http://scn.sap.com/docs/DOC-42525
