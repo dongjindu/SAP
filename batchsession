@@ -1,0 +1,83 @@
+form sub1.
+  data: ltbdcdata type standard table of bdcdata with header line.
+  data: ltbdcdata1 type standard table of bdcdata with header line.
+  DATA:  ltMESSTAB LIKE BDCMSGCOLL OCCURS 0 WITH HEADER LINE.
+  data: lve_group_opened.
+  DATA: V_FILE TYPE STRING.
+  V_FILE = 'C:\Users\HIS20166\Desktop\hmma\testing\111\txt\'.
+  CONCATENATE V_FILE 'pcc close list.xlsx Set del flag.txt' INTO V_FILE.
+  WRITE: / 'INPUT FILE NAME: ', V_FILE.
+    CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = v_file
+      filetype                = 'ASC'
+      has_field_separator     = 'X'
+    TABLES
+      data_tab                = ltbdcdata
+    EXCEPTIONS
+      file_open_error         = 1
+      others = 2
+    .
+    DATA: LVEXECUTOR TYPE SY-UNAME.
+    LVEXECUTOR = 'HIS20166'.
+"    IF SY-UNAME = LVEXECUTOR. BREAK-POINT. ENDIF.
+    call function 'BDC_OPEN_GROUP'
+      exporting
+        client = sy-mandt
+        group = 'PCCDelFlag'
+        user = sy-uname
+        keep = 'X'
+      exceptions
+        client_invalid = 1
+        others = 2
+      .
+    IF SY-SUBRC NE 0 AND SY-UNAME = LVEXECUTOR. BREAK-POINT. ENDIF.
+    data: lVtabix type i. lVtabix = 0.
+    data: lvtrans type i. lvtrans = 0.
+    DATA: LVTCODE TYPE SY-TCODE.
+    DATA: LVFUTURETCODE TYPE SY-TCODE.
+    DATA: LVLINES TYPE I.
+    DESCRIBE TABLE LTBDCDATA LINES LVLINES.
+    loop at ltbdcdata.
+      lVtabix = lVtabix + 1.
+      IF LVTABIX = 1 AND LTBDCDATA-DYNBEGIN = 'T'.
+        LVTCODE = LTBDCDATA-FNAM.
+        CONTINUE.
+      ENDIF.
+      if ltbdcdata-dynBEGIN = 'T' AND LVTABIX > 1.
+        LVFUTURETCODE = LTBDCDATA-FNAM.
+        call function 'BDC_INSERT'
+            exporting
+              tcode = LVTCODE
+            tables
+              dynprotab = ltbdcdata1
+            exceptions
+              internal_error = 1
+              not_open = 2
+              others = 3.
+        lvtrans = lvtrans + 1.
+        if lvtrans > 20.
+          exit.
+        endif.
+        LVTCODE = LVFUTURETCODE.
+        REFRESH LTBDCDATA1.
+        CLEAR LTBDCDATA1.
+       else.
+         CLEAR LTBDCDATA1.
+         MOVE-CORRESPONDING LTBDCDATA TO LTBDCDATA1.
+         APPEND LTBDCDATA1.
+       endif.
+       IF LVTABIX = LVLINES.
+         CALL FUNCTION 'BDC_INSERT'
+            EXPORTING
+              TCODE = LVTCODE
+            TABLES
+              DYNPROTAB = LTBDCDATA1
+            EXCEPTIONS
+              INTERNAL_ERROR =1
+              NOT_OPEN = 2
+              OTHERS = 3.
+       ENDIF.
+     endloop.
+     call function 'BDC_CLOSE_GROUP'.
+endform.
