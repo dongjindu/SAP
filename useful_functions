@@ -36,3 +36,15 @@ EXCEPTIONS
 generate_subpool_dir_full = 1
 OTHERS                    = 2.
 check http://scn.sap.com/docs/DOC-42525
+==gui_upload==
+    call function 'GUI_UPLOAD'
+      EXPORTING
+        FILENAME = 'C:\txt\pcc close list.xlsx PCC List.TXT'
+        FILETYPE = 'ASC'
+        HAS_FIELD_SEPARATOR = 'X'
+      TABLES
+        DATA_TAB = LT002
+      EXCEPTIONS
+        FILE_OPEN_ERROR = 1
+        OTHERS = 2.
+
