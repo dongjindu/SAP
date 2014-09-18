@@ -1,0 +1,177 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZRCO_LABORTOP                                              *
+*----------------------------------------------------------------------*
+TABLES:   COSS, COSP,COEP, CSKS,
+          ZSCO_LABOR, pa0002.
+
+
+RANGES: R_CC    FOR  CSKS-KOSTL.
+RANGES: R_CE    FOR  COSS-KSTAR.
+RANGES: P_PERBL FOR SY-DATUM.
+DATA:   T_CEHIER   LIKE SETHIER   OCCURS 0 WITH HEADER LINE.
+DATA:   T_CEVALUES LIKE SETVALUES OCCURS 0 WITH HEADER LINE.
+
+DATA:   BEGIN OF LIST_TAB  OCCURS 0.
+          INCLUDE STRUCTURE PNA_CCDATA.
+DATA:     SEQNO LIKE PPOIX-SEQNO.
+DATA:     RUN_ID TYPE P_EVNUM.
+DATA:     FLD_NAME(10) TYPE C.
+DATA:   END OF LIST_TAB.
+
+DATA: LIST_TABLE LIKE LIST_TAB OCCURS 0 with header line.
+
+DATA:   RSPAR LIKE RSPARAMS OCCURS 10 WITH HEADER LINE.
+RANGES: R_WT FOR T512W-LGART.
+DATA:   OK_CODE LIKE SY-UCOMM,
+        SAVE_OK LIKE SY-UCOMM.
+TYPES:  BEGIN OF S_EE,
+         PERNR     LIKE PA0001-PERNR,
+         PERSG     LIKE PA0001-PERSG,
+         PTEXT     LIKE T501T-PTEXT,
+         PERSK     LIKE PA0001-PERSK,
+         SCHKZ     LIKE PA0007-SCHKZ,
+         BEGDA     LIKE PA0001-BEGDA,
+        END OF S_EE.
+TYPES:  BEGIN OF S_OUT,
+         GRP1      LIKE ZSCO_LABOR-GRP1,
+         GRP2      LIKE ZSCO_LABOR-GRP1,
+         GRP3      LIKE ZSCO_LABOR-GRP1,
+         KOSTL     LIKE CSKS-KOSTL,
+         FROCC     LIKE CSKS-KOSTL,
+         TOCC      LIKE CSKS-KOSTL,
+         PERSG     LIKE PA0001-PERSG,
+         GTEXT(10) TYPE C,
+         PERSK     LIKE PA0001-PERSK,
+         KTEXT(10) TYPE C,
+         SCHKZ     LIKE PA0007-SCHKZ,
+         KZTXT(10) TYPE C,
+         ZCUNT     LIKE PNA_CCDATA-EMP_COUNT,
+         REGUL     LIKE PNA_CCDATA-BETRG,
+         OVERT     LIKE PNA_CCDATA-BETRG,
+         BONUS     LIKE PNA_CCDATA-BETRG,
+         ZLEAV     LIKE PNA_CCDATA-BETRG,
+         OTHCO     LIKE PNA_CCDATA-BETRG,
+         TOTCO     LIKE PNA_CCDATA-BETRG,
+         PENSN     LIKE PNA_CCDATA-BETRG,
+         INSUR     LIKE PNA_CCDATA-BETRG,
+         TAX       LIKE PNA_CCDATA-BETRG,
+         OTHBE     LIKE PNA_CCDATA-BETRG,
+         TOTBE     LIKE PNA_CCDATA-BETRG,
+         TCOST     LIKE PNA_CCDATA-BETRG,
+         TREGU     LIKE PNA_CCDATA-ANZHL,
+         TOVER     LIKE PNA_CCDATA-ANZHL,
+         TOTHR     LIKE PNA_CCDATA-ANZHL,
+         THOUR     LIKE PNA_CCDATA-ANZHL,
+        END OF S_OUT.
+TYPES:  BEGIN OF S_DIS.
+          INCLUDE TYPE S_OUT.
+TYPES:    CLRTB     TYPE LVC_T_SCOL.
+TYPES:  END OF S_DIS.
+DATA:   IT_EE   TYPE STANDARD TABLE OF S_EE.
+DATA:   IT_OUT  TYPE STANDARD TABLE OF S_OUT.
+DATA:   WA_OUT  TYPE S_OUT.
+DATA:   IT_DIS  TYPE STANDARD TABLE OF S_DIS.
+DATA:   IT_OUT1 TYPE STANDARD TABLE OF S_OUT.
+DATA:   BEGIN OF IT_COVP OCCURS 0,
+           GJAHR   LIKE COVP-GJAHR,
+           PERIO   LIKE COVP-PERIO,
+           KOSTL   LIKE CSKS-KOSTL,
+           OBJNR   LIKE COVP-OBJNR,
+           PAROB1  LIKE COVP-PAROB1,
+           BEKNZ   LIKE COVP-BEKNZ,
+           SGTXT   LIKE COVP-SGTXT,
+           WKGBTR  LIKE COVP-WKGBTR,
+           PKOST   LIKE CSKS-KOSTL,
+        END OF IT_COVP.
+DATA:   BEGIN OF IT_CATSCO OCCURS 0,
+          COUNTER    LIKE CATSCO-COUNTER,
+          STOKZ      LIKE CATSCO-STOKZ,
+          WORKDATE   LIKE CATSCO-WORKDATE,
+          CATSHOURS  LIKE CATSCO-CATSHOURS,
+          SKOSTL     LIKE CATSCO-SKOSTL,
+          LSTAR      LIKE CATSCO-LSTAR,
+          RKOSTL     LIKE CATSCO-RKOSTL,
+        END OF IT_CATSCO.
+DATA:   BEGIN OF IT_CC_GRP OCCURS 0,
+          GRP1      LIKE ZSCO_LABOR-GRP1,
+          GRP2      LIKE ZSCO_LABOR-GRP1,
+          GRP3      LIKE ZSCO_LABOR-GRP1.
+          INCLUDE STRUCTURE SETVALUES.
+DATA:   END OF IT_CC_GRP.
+DATA:   BEGIN OF IT_SCHKZ OCCURS 0,
+         SCHKZ       LIKE PA0007-SCHKZ,
+         PTEXT(10),
+        END OF IT_SCHKZ.
+DATA:   BEGIN OF IT_PERSK OCCURS 0,
+          PERSK      LIKE PA0001-PERSK,
+          PTEXT(10),
+        END OF IT_PERSK.
+DATA:   BEGIN OF IT_PERSG OCCURS 0,
+          PERSG      LIKE PA0001-PERSG,
+          PTEXT(10),
+        END OF IT_PERSG.
+DATA:   L_LINES TYPE I.
+
+data    c_mark     type c value 'X'.
+* ALV
+
+DATA:   WC_CONTROL        TYPE        SCRFNAME VALUE 'CC_ALV',
+        WC_ALV            TYPE REF TO CL_GUI_ALV_GRID,
+        WC_CONTAINER      TYPE REF TO CL_GUI_CUSTOM_CONTAINER.
+
+* CLASS DECLARATION
+CLASS   LCL_EVENT_RECEIVER DEFINITION DEFERRED. "ALV EVENT HANDLE
+
+DATA :  EVENT_RECEIVER TYPE REF TO LCL_EVENT_RECEIVER.
+
+* INTERNAL TABLES FOR ALV GRID
+DATA : IT_FIELDCAT     TYPE LVC_T_FCAT ,
+       IT_FIELDNAME    TYPE SLIS_T_FIELDCAT_ALV,
+       IT_SORT         TYPE LVC_T_SORT.
+
+* VARIABLES FOR ALV GRID
+DATA : WS_LAYOUT TYPE LVC_S_LAYO,
+       W_VARIANT   TYPE DISVARIANT,          "for parameter IS_VARIANT
+       W_FIELDNAME LIKE LINE OF IT_FIELDCAT,
+       W_REPID     LIKE SY-REPID,
+       W_CNT       TYPE I,                   "Field count
+       W_SAVE      TYPE C   VALUE 'A'.   "for Parameter I_SAVE
+*/-   Saving Options for Layouts
+*SPACE- Layouts cannot be saved.
+*'U'  - Only user-defined layouts can be saved.
+*'X'  - Only global layouts can be saved.
+*'A'  - Both user-defined and global layouts can be saved
+
+DATA: W_CONTAINER(100),
+      W_CONTROL(100),
+      W_ALV(100),
+      W_ITAB(100),
+      W_STRUCTURE LIKE DD02L-TABNAME.
+
+CONSTANTS: C_STRUCTURE(100) VALUE 'ZSCO_AALA_REPORT_'.
+
+
+****************************************************************
+* LOCAL CLASSES: EVEN HANDLING
+****************************************************************
+CLASS LCL_EVENT_RECEIVER DEFINITION.
+  PUBLIC SECTION.
+    METHODS:
+
+    HANDLE_DOUBLE_CLICK
+        FOR EVENT DOUBLE_CLICK OF CL_GUI_ALV_GRID
+            IMPORTING E_ROW
+                      E_COLUMN
+                      ES_ROW_NO.
+ENDCLASS.
+
+****************************************************************
+* LOCAL CLASSES:IMPLEMENTATION
+****************************************************************
+CLASS LCL_EVENT_RECEIVER IMPLEMENTATION.
+  METHOD HANDLE_DOUBLE_CLICK.
+    PERFORM DBL_CLICK USING E_COLUMN-FIELDNAME
+                                 ES_ROW_NO-ROW_ID.
+
+  ENDMETHOD.                           "handle_double_click
+ENDCLASS.
