@@ -1,0 +1,374 @@
+************************************************************************
+*** Report  ID   : ZHBCR00100
+*** Report  Name : TABLE HISTOGRAM
+*** Created By   : MIRALUZ Co.Ltd
+*** Description.
+************************************************************************
+REPORT  ZHBCR00100 NO STANDARD PAGE HEADING  LINE-SIZE 140.
+
+TABLES : DD17S , DD12L,DBA_TABLES, DD03T.
+
+DATA: CURSORFIELD(020) TYPE C,
+      CURSORVALUE(020) TYPE C,
+      CURSORLINE LIKE SY-LILLI,
+      OKCODE LIKE SY-UCOMM.
+DATA: TABLE_LIST LIKE DB2TBDETL OCCURS 0 WITH HEADER LINE.
+DATA: RE_NUM LIKE DBSTATAM-NROWS.
+
+DATA: BEGIN OF DBA_TAB_COLUMNS73 OCCURS 5.
+        INCLUDE STRUCTURE COLUMNS_ST.
+DATA: END OF DBA_TAB_COLUMNS73.
+
+DATA: BEGIN OF DD03V_TAB OCCURS 50.
+        INCLUDE STRUCTURE DD03V.
+DATA: END OF DD03V_TAB.
+
+DATA : BEGIN OF ITAB OCCURS 0,
+       NAME(18),
+       COLCARD TYPE P,
+END OF ITAB.
+
+DATA : BEGIN OF XTAB OCCURS 0,
+       IXNAME(18),
+       COLSEQ   TYPE P,
+       COLNAME(18) ,
+END OF XTAB.
+
+DATA: TABLE_NAME LIKE DBA_TABLES-TABLE_NAME,
+      NUM_ROW LIKE DBA_TABLES-NUM_ROWS,
+      SAMPLE_SIZE LIKE DBA_TABLES-SAMPLESIZE.
+DATA: SELTAB     TYPE TABLE OF RSPARAMS,
+      SELTAB_WA  LIKE LINE OF SELTAB.
+DATA: T_DDTEXT LIKE DD04T-DDTEXT.
+DATA: T_AS4USER LIKE DD12L-AS4USER,
+      T_AS4DATE LIKE DD12L-AS4DATE,
+      T_AS4TIME LIKE DD12L-AS4TIME.
+DATA: BEGIN OF IT_INDEX OCCURS 0 ,
+      INDEXNAME LIKE DD17S-INDEXNAME,
+      POSITION LIKE DD17S-POSITION,
+      FIELDNAME LIKE DD17S-FIELDNAME,
+      AS4USER LIKE DD12L-AS4USER,
+      AS4DATE LIKE DD12L-AS4DATE,
+      AS4TIME LIKE DD12L-AS4TIME,
+      DBSTATE LIKE DD12L-DBSTATE,
+     END OF IT_INDEX.
+DATA: DEACTIVE_FLAG(1).
+DATA: OWNER(10).
+*
+DATA: IT_COUNT TYPE I.
+*DATA  tab_name.
+PARAMETER : TAB_NAME LIKE DD02L-TABNAME OBLIGATORY.
+
+START-OF-SELECTION.
+
+  CALL FUNCTION 'DB_DBSCHEMA'
+    IMPORTING
+      dbschema = Owner.
+  EXEC SQL.
+
+    SELECT  NUM_ROWS, SAMPLE_SIZE
+    INTO  :NUM_ROW, :SAMPLE_SIZE
+    FROM
+      ALL_TABLES
+    WHERE
+      OWNER = :OWNER AND TABLE_NAME = :TAB_NAME
+  ENDEXEC.
+
+  CALL FUNCTION 'DB02_ORA_TABLE_INDEX_ANALYSIS' DESTINATION 'NONE'
+    EXPORTING
+      SEG_NAME        = TAB_NAME
+      ANALYSIS        = 'C' "'S', 'E', 'I',
+      SEG_TYPE        = 'TABLE' "SEG_TYPE = 'INDEX'
+      OWNER           = 'SAPR3'
+    TABLES
+      DBA_TAB_COLUMNS = DBA_TAB_COLUMNS73 "TAB_LIST
+      DD03V_TAB       = DD03V_TAB
+    EXCEPTIONS
+      NO_SELECTION    = 1
+      OTHERS          = 2.
+
+  if dd03v_tab[] is initial.
+    DATA : dd03p_tab LIKE DD03P OCCURS 0 WITH HEADER LINE.
+    call function 'DD_TABD_GET'
+         exporting
+*            get_state      = getstate
+              langu          = sy-langu
+*         PRID           = 0
+              tabl_name      = TAB_NAME
+              withtext       = 'X'
+              add_typeinfo   = 'D'       "Auf die DD03L vertrauen
+*      importing
+*           dd02v_wa_a     = dd02v_wa
+*           got_state      = gotst_tabd
+        tables
+             dd03p_tab_a    = dd03p_tab
+*           dd05m_tab_a    = dd05m_tab
+*           dd08v_tab_a    = dd08v_tab
+*           dd35v_tab_a    = dd35v_tab
+*           dd36m_tab_a    = dd36m_tab
+        exceptions
+             others         = 2.
+             IF SY-SUBRC = 0.
+             LOOP AT dd03p_tab.
+               MOVE-CORRESPONDING dd03p_tab TO DD03V_TAB.
+               APPEND DD03V_TAB.
+               CLEAR DD03V_TAB.
+             ENDLOOP.
+             ENDIF.
+
+  endif.
+
+  READ TABLE DBA_TAB_COLUMNS73 INDEX 1.
+  SORT DBA_TAB_COLUMNS73 BY NUM_DISTIN DESCENDING COLUMN_ID.
+  FORMAT RESET.
+  DATA: II TYPE I.
+  LOOP AT DBA_TAB_COLUMNS73.
+    CLEAR T_DDTEXT.
+    READ TABLE DD03V_TAB WITH KEY
+         FIELDNAME = DBA_TAB_COLUMNS73-COLUMN_N.
+    IF SY-SUBRC = 0.
+      SELECT SINGLE DDTEXT
+        INTO T_DDTEXT
+        FROM DD04T
+       WHERE ROLLNAME = DD03V_TAB-ROLLNAME
+         AND DDLANGUAGE = '3'.
+      IF SY-SUBRC <> 0.
+        SELECT SINGLE DDTEXT
+          INTO T_DDTEXT
+          FROM DD04T
+         WHERE ROLLNAME = DD03V_TAB-ROLLNAME
+           AND DDLANGUAGE = 'E'.
+      ENDIF.
+    ENDIF.
+    IF T_DDTEXT = ''.
+      SELECT SINGLE DDTEXT
+        INTO T_DDTEXT
+        FROM DD03T
+       WHERE FIELDNAME = DBA_TAB_COLUMNS73-COLUMN_N
+         AND DDLANGUAGE = '3'
+         AND TABNAME = TAB_NAME.
+      IF SY-SUBRC <> 0.
+        SELECT SINGLE DDTEXT
+          INTO T_DDTEXT
+          FROM DD03T
+         WHERE FIELDNAME = DBA_TAB_COLUMNS73-COLUMN_N
+           AND DDLANGUAGE = 'E'
+           AND TABNAME = TAB_NAME.
+      ENDIF.
+    ENDIF.
+    IF II = 0.
+      II = 1.
+      FORMAT COLOR 2 INTENSIFIED OFF.
+      WRITE :/ DBA_TAB_COLUMNS73-COLUMN_N(15),T_DDTEXT,
+               DBA_TAB_COLUMNS73-NUM_DISTIN LEFT-JUSTIFIED.
+*      HIDE: dba_tab_columns73-column_n,
+*            dba_tab_columns73-num_distin.
+    ELSE.
+      II = 0.
+      FORMAT COLOR OFF.
+      WRITE :/ DBA_TAB_COLUMNS73-COLUMN_N(15),T_DDTEXT,
+               DBA_TAB_COLUMNS73-NUM_DISTIN LEFT-JUSTIFIED.
+*      HIDE: dba_tab_columns73-column_n,
+*            dba_tab_columns73-num_distin.
+    ENDIF.
+  ENDLOOP.
+  ULINE.
+  FORMAT RESET.
+  WRITE : /1 'SAP/R3 INDEX' COLOR 7 INTENSIFIED OFF.
+  ULINE.
+  DATA: III TYPE STRING.
+  DATA: TEMP1 TYPE STRING.
+  DATA: *DD03K LIKE DD03K OCCURS 0 WITH HEADER LINE.
+  SELECT * FROM DD03K
+  INTO CORRESPONDING FIELDS OF TABLE *DD03K
+  WHERE TABNAME = TAB_NAME
+  ORDER BY TABNAME POSITION.
+  CONCATENATE TAB_NAME '~Primary' INTO III.
+  DATA: TEMP_CHAR(100).
+  DATA: T_FLAG1(1).
+  T_FLAG1 = 'X'.
+  LOOP AT *DD03K.
+    IF T_FLAG1 = 'X'.
+      CONCATENATE 'Primary' TEMP_CHAR INTO TEMP_CHAR.
+      CONCATENATE TEMP_CHAR ':' *DD03K-FIELDNAME INTO TEMP_CHAR
+                  SEPARATED BY SPACE.
+      T_FLAG1 = ''.
+      CONTINUE.
+    ENDIF.
+    CONCATENATE TEMP_CHAR *DD03K-FIELDNAME INTO TEMP_CHAR
+                SEPARATED BY ' + '.
+  ENDLOOP.
+  WRITE:/ TEMP_CHAR.
+
+  SELECT A~INDEXNAME A~POSITION A~FIELDNAME
+         B~AS4USER  B~AS4DATE B~AS4TIME B~DBSTATE
+    INTO TABLE IT_INDEX
+    FROM DD17S AS A INNER JOIN DD12L AS B
+                       ON B~SQLTAB = A~SQLTAB
+                      AND B~INDEXNAME = A~INDEXNAME
+  WHERE A~SQLTAB = TAB_NAME.
+  TEMP_CHAR = ''.
+  DESCRIBE TABLE IT_INDEX LINES IT_COUNT.
+  LOOP AT IT_INDEX.
+    ON CHANGE OF IT_INDEX-INDEXNAME.
+      IF TEMP_CHAR <> '' AND DEACTIVE_FLAG =''.
+        WRITE:/ TEMP_CHAR.
+      ELSEIF TEMP_CHAR <> '' AND DEACTIVE_FLAG ='X'.
+        WRITE:/ TEMP_CHAR,' <- DB # ### ## !!'.
+      ENDIF.
+      CLEAR TEMP_CHAR.
+      CLEAR DEACTIVE_FLAG.
+      CONCATENATE IT_INDEX-INDEXNAME ':' IT_INDEX-FIELDNAME
+                     INTO TEMP_CHAR
+                     SEPARATED BY SPACE.
+      IF IT_COUNT = 1.
+        WRITE:/ TEMP_CHAR.
+        EXIT.
+      ENDIF.
+      CONTINUE.
+    ENDON.
+    IF IT_INDEX-DBSTATE <> ''.
+      DEACTIVE_FLAG = 'X'.
+    ENDIF.
+    CONCATENATE TEMP_CHAR IT_INDEX-FIELDNAME INTO TEMP_CHAR
+                     SEPARATED BY ' + '.
+    AT LAST.
+      IF DEACTIVE_FLAG =''.
+        WRITE:/ TEMP_CHAR.
+      ELSE.
+        WRITE:/ TEMP_CHAR,' <- DB # ### ## !!'.
+      ENDIF.
+    ENDAT.
+
+  ENDLOOP.
+  ULINE.
+  WRITE : /1 'SAP/R3 INDEX DETAIL' COLOR 7 INTENSIFIED OFF.
+  ULINE.
+  LOOP AT *DD03K.
+    READ TABLE DBA_TAB_COLUMNS73 WITH KEY COLUMN_N = *DD03K-FIELDNAME.
+    WRITE :/1 III,
+           25 *DD03K-POSITION ,
+           40 *DD03K-FIELDNAME,
+           50 DBA_TAB_COLUMNS73-NUM_DISTIN.
+  ENDLOOP.
+
+  SELECT * FROM DD17S WHERE SQLTAB = TAB_NAME .
+    SELECT SINGLE * FROM DD12L WHERE SQLTAB = TAB_NAME
+                               AND   INDEXNAME = DD17S-INDEXNAME.
+    READ TABLE DBA_TAB_COLUMNS73 WITH KEY COLUMN_N = DD17S-FIELDNAME.
+    ON CHANGE OF DD17S-INDEXNAME.
+      ULINE.
+      CLEAR : T_AS4USER,T_AS4TIME.
+      CONCATENATE TAB_NAME '~' DD17S-INDEXNAME INTO III.
+      CONDENSE III.
+      SELECT SINGLE AS4USER AS4TIME AS4DATE
+        INTO (T_AS4USER,T_AS4TIME,T_AS4DATE)
+        FROM DD12L
+       WHERE SQLTAB = TAB_NAME
+         AND INDEXNAME = DD17S-INDEXNAME.
+      TEMP1 = T_AS4USER.
+      CONDENSE TEMP1.
+      IF T_AS4USER = 'SAP' OR T_AS4USER = 'DDIC'.
+        WRITE :/ III,' ( ', 'Last changed on/by :', TEMP1,'/',
+                T_AS4DATE,' ',T_AS4TIME,' ) '.
+      ELSE.
+*        WRITE :/ '## #### #### ##' COLOR 1 INTENSIFIED OFF.
+        FORMAT COLOR   COL_KEY INTENSIFIED ON.
+        WRITE :/ III,' ( ', 'Last changed on/by :', TEMP1,'/',
+              T_AS4DATE,' ',T_AS4TIME,' ) '.
+        FORMAT COLOR OFF INTENSIFIED OFF.
+      ENDIF.
+      ULINE.
+    ENDON.
+
+    CONCATENATE TAB_NAME '~' DD17S-INDEXNAME INTO III.
+    WRITE :/5 DD17S-POSITION ,
+           20 DD17S-FIELDNAME,
+           40 DBA_TAB_COLUMNS73-NUM_DISTIN,
+           50 DD12L-DBSTATE.
+  ENDSELECT.
+  ULINE.
+  CHECK SY-SUBRC <> 0.
+  WRITE :/ '## #### #### ##' COLOR 1 INTENSIFIED OFF.
+
+END-OF-SELECTION.
+  SET PF-STATUS 'STAT1000'.
+
+AT USER-COMMAND.
+  CASE SY-UCOMM.
+    WHEN 'ANAL'.
+      CLEAR: SELTAB_WA.
+      CLEAR: SELTAB[].
+      MOVE: 'OBJNAME' TO SELTAB_WA-SELNAME,
+            'P'     TO SELTAB_WA-KIND,      " PARAMETER
+            TAB_NAME    TO SELTAB_WA-LOW.
+      APPEND SELTAB_WA TO SELTAB.
+      CLEAR SELTAB_WA.
+      MOVE: 'ESTIMATE' TO SELTAB_WA-SELNAME,
+            'P'     TO SELTAB_WA-KIND,      " PARAMETER
+             'X'    TO SELTAB_WA-LOW.
+      APPEND SELTAB_WA TO SELTAB.
+      CLEAR SELTAB_WA.
+      MOVE: 'TABLE' TO SELTAB_WA-SELNAME,
+            'P'     TO SELTAB_WA-KIND,      " PARAMETER
+             'X'    TO SELTAB_WA-LOW.
+      APPEND SELTAB_WA TO SELTAB.
+      SUBMIT RSANAORA WITH SELECTION-TABLE SELTAB
+                         AND RETURN
+                          VIA SELECTION-SCREEN .
+    WHEN 'DIST'.
+      CLEAR SELTAB_WA.
+      CLEAR SELTAB[].
+      MOVE: 'P_TABLE' TO SELTAB_WA-SELNAME,
+            'P'     TO SELTAB_WA-KIND,      " PARAMETER
+            TAB_NAME    TO SELTAB_WA-LOW.
+      APPEND SELTAB_WA TO SELTAB.
+      CLEAR SELTAB_WA.
+      SUBMIT ZHBCR00101 WITH SELECTION-TABLE SELTAB
+                           AND RETURN VIA SELECTION-SCREEN.
+    WHEN 'USED'.
+      CLEAR SELTAB_WA.
+      CLEAR SELTAB[].
+      MOVE: 'TAB_NAME' TO SELTAB_WA-SELNAME,
+            'P'     TO SELTAB_WA-KIND,      " PARAMETER
+            TAB_NAME    TO SELTAB_WA-LOW.
+      APPEND SELTAB_WA TO SELTAB.
+      CLEAR SELTAB_WA.
+      SUBMIT ZHBCR00102   WITH SELECTION-TABLE SELTAB
+                           AND RETURN.
+    WHEN 'BACK'.  SET SCREEN 0.
+    WHEN 'CANC'.  LEAVE TO SCREEN 0.
+    WHEN 'EXIT'.  LEAVE PROGRAM.
+  ENDCASE.
+
+TOP-OF-PAGE.
+  PERFORM TITLE_HEADER.
+
+*TOP-OF-PAGE DURING LINE-SELECTION.
+*  PERFORM title_header.
+
+*&---------------------------------------------------------------------*
+*&      Form  Title_header
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM TITLE_HEADER.
+  DATA: DDTEXT LIKE DD02T-DDTEXT.
+  DATA: T_HEADER(50).
+  SELECT SINGLE DDTEXT
+    INTO DDTEXT
+    FROM DD02T
+   WHERE TABNAME = TAB_NAME
+     AND DDLANGUAGE = SY-LANGU.
+  CLEAR T_HEADER.
+  CONCATENATE TAB_NAME '(' DDTEXT ')' INTO T_HEADER
+              SEPARATED BY SPACE.
+  WRITE : 'Table :', T_HEADER,
+          'Last Analysis :',
+          DBA_TAB_COLUMNS73-LAST_ANAL,
+          'TOTAL_ROWS : ', NUM_ROW LEFT-JUSTIFIED.
+  ULINE.
+ENDFORM.                    " Title_header

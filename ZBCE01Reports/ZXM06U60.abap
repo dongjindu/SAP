@@ -1,0 +1,333 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZXM06U60                                                   *
+*----------------------------------------------------------------------*
+*& Date        User   Transport       Description
+*& 12/13/2004  Shiva  UD1K908101      Pass work station information.
+*& 03/22/2005  Shiva  UD1K915136      1. Ignore segment if quantity 0.
+*                                2. Sum segment having same date & time.
+*                             3. Default time '0630' if schd.time blank.
+*                                     4. Get storage bin info. from
+*                                   material master and split at '*' for
+*                                   dock door and work station info.
+*& 03/29/2005  Shiva   UD1K915239   Don't send IDoc if all the Schd.line
+*                                    quantity is zero.
+*& 05/05/2006  Manju   UD1K920558   Consider ASN Pipeline  Qty from
+*&                                  EKES while arriving at Open Qty
+*& 05/16/2006  Manju   UD1K920685   Bug fixing
+*&---------------------------------------------------------------------*
+DATA: WA_EDIDD LIKE EDIDD,
+      WA_E1EDP10 LIKE E1EDP10,
+      WA_E1EDP16 LIKE E1EDP16,
+      WA_E1EDKA1 LIKE E1EDKA1.
+
+DATA: BEGIN OF WA_MARD,
+       MATNR LIKE MARD-MATNR,
+       WERKS LIKE MARD-WERKS,
+       LGORT LIKE MARD-LGORT,
+       LGPBE LIKE MARD-LGPBE,
+      END OF WA_MARD.
+DATA: BEGIN OF WA_TMP_E1EDP16,
+        ETTYP LIKE E1EDP16-ETTYP,
+        PRGRS LIKE E1EDP16-PRGRS,
+        EDATUV LIKE E1EDP16-EDATUV,
+        EZEIT  LIKE E1EDP16-EZEIT,
+        EDATUB LIKE E1EDP16-EDATUB,
+        ETVTF  LIKE E1EDP16-ETVTF,
+        WMENG TYPE P DECIMALS 2,
+        FZABR TYPE P DECIMALS 2,
+        BSTAS LIKE E1EDP16-BSTAS,
+      END OF WA_TMP_E1EDP16.
+DATA: IT_MARD LIKE TABLE OF WA_MARD,
+      IT_E1EDP16 LIKE TABLE OF WA_TMP_E1EDP16.
+
+* Begin of changes - UD1K920558
+DATA : BEGIN OF IT_EKES OCCURS 0,
+        EBELN LIKE EKES-EBELN,
+        EBELP LIKE EKES-EBELP,
+        ETENS LIKE EKES-ETENS,
+        MENGE LIKE EKES-MENGE,
+        DABMG LIKE EKES-DABMG,
+       END OF IT_EKES.
+DATA : L_DIFF LIKE EKES-MENGE.
+
+DATA : BEGIN OF WA_EKES OCCURS 0,
+        EBELN LIKE EKES-EBELN,
+        EBELP LIKE EKES-EBELP,
+        MENGE LIKE EKES-MENGE,
+       END OF WA_EKES.
+
+* End of changes - UD1K920558
+
+DATA: LT_E1EDP16_SPLIT LIKE TABLE OF WA_TMP_E1EDP16 WITH HEADER LINE.
+DATA: BEGIN OF LT_AUSP OCCURS 0,
+      ATZHL LIKE AUSP-ATZHL,
+      ATWRT LIKE AUSP-ATWRT,
+      END OF LT_AUSP.
+
+DATA: L_LIFNR(10),
+      L_TQTY LIKE WA_TMP_E1EDP16-WMENG,
+      L_RQTY LIKE WA_TMP_E1EDP16-WMENG,
+      L_FZABR  LIKE WA_TMP_E1EDP16-WMENG,
+      L_MAX_DEL  TYPE I,
+      L_DUNIT TYPE I,
+      L_REMINDER TYPE I,
+      L_INTEGER TYPE I,
+      L_ACT_DEL TYPE I,
+      L_SUNIT TYPE I,
+      L_SQTY  TYPE I,
+      L_COUNT LIKE AUSP-ADZHL,
+      L_DATE_C(8),
+      L_DATE_NEXT LIKE SY-DATUM,
+      L_TIME_N(4) TYPE N.
+
+DATA: W_MATNR LIKE MARD-MATNR,
+      W_WERKS LIKE MARD-WERKS,
+      W_LGORT LIKE MARD-LGORT,
+      W_FZABR TYPE P DECIMALS 2,
+      W_IDX  TYPE I,
+      W_DFABL LIKE E1EDP10-DFABL,
+      W_VBRST LIKE E1EDP10-VBRST.
+
+IMPORT IT_MARD FROM MEMORY ID 'IT_MARD'.
+IF SY-SUBRC NE 0.
+  SELECT T1~MATNR WERKS LGORT LGPBE
+                               INTO TABLE IT_MARD
+                              FROM MARD AS T1
+                              INNER JOIN MARA AS T2
+                              ON T1~MATNR = T2~MATNR
+                              WHERE PROFL = 'V'.         "local parts
+  SORT IT_MARD BY MATNR WERKS LGORT.
+  EXPORT IT_MARD TO MEMORY ID 'IT_MARD'.
+ENDIF.
+LOOP AT DINT_EDIDD INTO WA_EDIDD
+          WHERE SEGNAM = 'E1EDP10'.
+  CLEAR WA_E1EDP10.
+  WA_E1EDP10 = WA_EDIDD-SDATA.
+  W_MATNR = WA_E1EDP10-IDNKD.
+  W_WERKS = WA_E1EDP10-KWERK.
+  W_LGORT = WA_E1EDP10-KLGOR.
+
+  READ TABLE IT_MARD INTO WA_MARD WITH KEY MATNR = W_MATNR
+                                           WERKS = W_WERKS
+                                           LGORT = W_LGORT
+                                           BINARY SEARCH
+                                           TRANSPORTING LGPBE.
+  IF SY-SUBRC NE 0.
+    WA_E1EDP10-DFABL = SPACE.
+    WA_E1EDP10-VBRST = SPACE.
+  ELSE.
+    SPLIT WA_MARD-LGPBE AT '*' INTO W_DFABL W_VBRST.
+    WA_E1EDP10-DFABL = W_DFABL.
+    WA_E1EDP10-VBRST = W_VBRST.
+    CLEAR: W_DFABL, W_VBRST.
+  ENDIF.
+  WA_EDIDD-SDATA = WA_E1EDP10.
+  MODIFY DINT_EDIDD FROM WA_EDIDD TRANSPORTING SDATA.
+ENDLOOP.
+*Combine repeated details into unique segment.
+CLEAR: WA_E1EDP16.
+* Begin of changes -  UD1K920558
+IF CONTROL_RECORD_OUT-MESTYP EQ 'DELJIT'.
+  L_DIFF = 0.
+  IF NOT DEKPO[] IS  INITIAL.
+    SELECT EBELN EBELP ETENS  MENGE DABMG FROM EKES
+          INTO TABLE  IT_EKES
+          FOR ALL ENTRIES IN DEKPO
+         WHERE EBELN = DEKPO-EBELN  AND
+               EBELP = DEKPO-EBELP  AND
+               DABMG EQ 0.
+*   delete it_ekes where  menge = it_ekes-DABMG .
+    LOOP AT IT_EKES.
+      MOVE-CORRESPONDING  IT_EKES TO WA_EKES.
+      COLLECT WA_EKES.
+    ENDLOOP.
+
+    READ TABLE WA_EKES INDEX 1.
+    IF SY-SUBRC EQ 0.
+      L_DIFF = WA_EKES-MENGE.
+    ENDIF.
+  ENDIF.
+  LOOP AT DINT_EDIDD INTO WA_EDIDD
+          WHERE SEGNAM = 'E1EDP16'.
+    WA_E1EDP16 = WA_EDIDD-SDATA.
+    IF WA_E1EDP16-WMENG EQ 0.
+    ELSE.
+      IF WA_E1EDP16-EZEIT IS INITIAL.
+        WA_E1EDP16-EZEIT ='0630'.
+      ENDIF.
+      WA_TMP_E1EDP16-ETTYP  = WA_E1EDP16-ETTYP.
+      WA_TMP_E1EDP16-PRGRS  = WA_E1EDP16-PRGRS.
+      WA_TMP_E1EDP16-EDATUV = WA_E1EDP16-EDATUV.
+      WA_TMP_E1EDP16-EZEIT  = WA_E1EDP16-EZEIT.
+      WA_TMP_E1EDP16-EDATUB = WA_E1EDP16-EDATUB.
+      WA_TMP_E1EDP16-ETVTF  = WA_E1EDP16-ETVTF.
+      WA_TMP_E1EDP16-WMENG = WA_E1EDP16-WMENG.
+      WA_TMP_E1EDP16-BSTAS = WA_E1EDP16-BSTAS.
+*      collect wa_tmp_e1edp16 into it_e1edp16. "UD1K920685
+*      describe table it_e1edp16 lines w_idx.  "UD1K920685
+      IF  L_DIFF > WA_TMP_E1EDP16-WMENG.
+        L_DIFF = L_DIFF - WA_TMP_E1EDP16-WMENG .
+        WA_TMP_E1EDP16-WMENG = 0.
+      ELSE.
+        WA_TMP_E1EDP16-WMENG = WA_TMP_E1EDP16-WMENG - L_DIFF.
+        L_DIFF = 0.
+      ENDIF.
+      COLLECT WA_TMP_E1EDP16 INTO IT_E1EDP16.               "UD1K920685
+      DESCRIBE TABLE IT_E1EDP16 LINES W_IDX.                "UD1K920685
+
+      W_FZABR =  W_FZABR + WA_TMP_E1EDP16-WMENG.
+      WA_TMP_E1EDP16-FZABR = W_FZABR.
+      MODIFY IT_E1EDP16 FROM WA_TMP_E1EDP16 INDEX W_IDX
+      TRANSPORTING FZABR.
+    ENDIF.
+    CLEAR: WA_E1EDP16 , WA_TMP_E1EDP16 .
+  ENDLOOP.
+  DELETE  IT_E1EDP16 WHERE WMENG EQ 0.
+  FREE : IT_EKES, WA_EKES.
+ELSE.
+* End of changes - UD1K920558
+
+  LOOP AT DINT_EDIDD INTO WA_EDIDD
+          WHERE SEGNAM = 'E1EDP16'.
+    WA_E1EDP16 = WA_EDIDD-SDATA.
+    IF WA_E1EDP16-WMENG EQ 0.
+    ELSE.
+      IF WA_E1EDP16-EZEIT IS INITIAL.
+        WA_E1EDP16-EZEIT ='0630'.
+      ENDIF.
+      WA_TMP_E1EDP16-ETTYP  = WA_E1EDP16-ETTYP.
+      WA_TMP_E1EDP16-PRGRS  = WA_E1EDP16-PRGRS.
+      WA_TMP_E1EDP16-EDATUV = WA_E1EDP16-EDATUV.
+      WA_TMP_E1EDP16-EZEIT  = WA_E1EDP16-EZEIT.
+      WA_TMP_E1EDP16-EDATUB = WA_E1EDP16-EDATUB.
+      WA_TMP_E1EDP16-ETVTF  = WA_E1EDP16-ETVTF.
+      WA_TMP_E1EDP16-WMENG = WA_E1EDP16-WMENG.
+      WA_TMP_E1EDP16-BSTAS = WA_E1EDP16-BSTAS.
+      COLLECT WA_TMP_E1EDP16 INTO IT_E1EDP16.
+      DESCRIBE TABLE IT_E1EDP16 LINES W_IDX.
+      W_FZABR =  W_FZABR + WA_TMP_E1EDP16-WMENG.
+      WA_TMP_E1EDP16-FZABR = W_FZABR.
+   MODIFY IT_E1EDP16 FROM WA_TMP_E1EDP16 INDEX W_IDX TRANSPORTING FZABR.
+    ENDIF.
+    CLEAR: WA_E1EDP16 , WA_TMP_E1EDP16 .
+  ENDLOOP.
+
+ENDIF.
+
+** Added by Furong on 09/24/10
+IF CONTROL_RECORD_OUT-MESTYP EQ 'DELJIT'.
+  SELECT SINGLE BSTRF INTO L_RQTY FROM MARC
+      WHERE MATNR = W_MATNR AND WERKS = W_WERKS.
+  IF L_RQTY > 0.
+    LOOP AT DINT_EDIDD INTO WA_EDIDD
+           WHERE SEGNAM = 'E1EDKA1'.
+
+      WA_E1EDKA1 = WA_EDIDD-SDATA.
+      IF WA_E1EDKA1-PARVW = 'LF'.
+        L_LIFNR = WA_E1EDKA1-PARTN.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+
+    SELECT ATZHL ATWRT INTO TABLE LT_AUSP
+      FROM AUSP AS A
+      INNER JOIN CABN AS B
+      ON A~ATINN = B~ATINN
+      WHERE OBJEK = L_LIFNR
+        AND KLART = '010'
+        AND ATNAM = 'ZTIMING'.
+    DESCRIBE TABLE LT_AUSP LINES L_MAX_DEL.
+    IF L_MAX_DEL > 0.
+      L_DATE_C = SY-DATUM.
+      REFRESH LT_E1EDP16_SPLIT.
+*      SORT LT_AUSP BY ATZHL.
+      SORT LT_AUSP BY ATWRT.
+      LOOP AT IT_E1EDP16 INTO WA_TMP_E1EDP16.
+        LT_E1EDP16_SPLIT = WA_TMP_E1EDP16.
+        IF WA_TMP_E1EDP16-EDATUV = L_DATE_C.
+          CLEAR: L_REMINDER, L_INTEGER, L_COUNT.
+          L_TQTY =  WA_TMP_E1EDP16-WMENG.
+          L_INTEGER =  L_TQTY DIV L_RQTY.
+          L_REMINDER =  L_TQTY MOD L_RQTY.
+          IF L_REMINDER > 0.
+            L_DUNIT = L_INTEGER + 1.
+          ELSE.
+            L_DUNIT = L_INTEGER .
+          ENDIF.
+          IF L_DUNIT > L_MAX_DEL.
+            L_ACT_DEL = L_MAX_DEL.
+          ELSE.
+            L_ACT_DEL = L_DUNIT.
+          ENDIF.
+          L_FZABR = WA_TMP_E1EDP16-FZABR - WA_TMP_E1EDP16-WMENG .
+          WHILE L_ACT_DEL > 0.
+            L_SUNIT =  L_DUNIT DIV L_ACT_DEL.
+            L_REMINDER =  L_DUNIT MOD L_ACT_DEL.
+            IF L_REMINDER  > 0.
+              L_SUNIT =  L_SUNIT + 1.
+            ENDIF.
+            L_SQTY = L_SUNIT * L_RQTY.
+            LT_E1EDP16_SPLIT-WMENG =  L_SQTY.
+            L_FZABR = L_FZABR + L_SQTY.
+            LT_E1EDP16_SPLIT-FZABR = L_FZABR.
+            L_DUNIT = L_DUNIT - L_SUNIT.
+            L_ACT_DEL = L_ACT_DEL - 1.
+            L_COUNT = L_COUNT + 1.
+*            READ TABLE LT_AUSP WITH KEY ATZHL = L_COUNT.
+            READ TABLE LT_AUSP INDEX L_COUNT.
+*            LT_E1EDP16_SPLIT-EZEIT = LT_AUSP-ATWRT.
+            CONCATENATE LT_AUSP-ATWRT+0(2) LT_AUSP-ATWRT+3(2)
+            INTO LT_E1EDP16_SPLIT-EZEIT.
+            IF LT_E1EDP16_SPLIT-EZEIT > '2400'.
+              L_DATE_NEXT = LT_E1EDP16_SPLIT-EDATUV.
+              L_DATE_NEXT = L_DATE_NEXT + 1.
+              LT_E1EDP16_SPLIT-EDATUV = L_DATE_NEXT.
+*              LT_E1EDP16_SPLIT-EDATUB = LT_E1EDP16_SPLIT-EDATUV.
+              L_TIME_N = LT_E1EDP16_SPLIT-EZEIT.
+              L_TIME_N = L_TIME_N - 2400.
+              LT_E1EDP16_SPLIT-EZEIT = L_TIME_N.
+            ENDIF.
+            APPEND LT_E1EDP16_SPLIT.
+          ENDWHILE.
+        ELSE.
+          APPEND LT_E1EDP16_SPLIT.
+        ENDIF.
+      ENDLOOP.
+      REFRESH: IT_E1EDP16.
+      IT_E1EDP16[] = LT_E1EDP16_SPLIT[].
+    ENDIF.
+  ENDIF.
+ENDIF.
+** End of addition on 09/24/10
+                                                            "UD1K920558
+DELETE DINT_EDIDD WHERE SEGNAM = 'E1EDP16'.
+
+CLEAR: WA_E1EDP16, WA_EDIDD.
+LOOP AT IT_E1EDP16 INTO WA_TMP_E1EDP16.
+  WA_E1EDP16-ETTYP = WA_TMP_E1EDP16-ETTYP.
+  WA_E1EDP16-PRGRS = WA_TMP_E1EDP16-PRGRS.
+  WA_E1EDP16-EDATUV = WA_TMP_E1EDP16-EDATUV.
+  WA_E1EDP16-EZEIT = WA_TMP_E1EDP16-EZEIT.
+  WA_E1EDP16-EDATUB = WA_TMP_E1EDP16-EDATUB.
+  WA_E1EDP16-ETVTF = WA_TMP_E1EDP16-ETVTF.
+  WA_E1EDP16-WMENG = WA_TMP_E1EDP16-WMENG.
+  SHIFT WA_E1EDP16-WMENG LEFT DELETING LEADING SPACE.
+  WA_E1EDP16-FZABR = WA_TMP_E1EDP16-FZABR.
+  SHIFT WA_E1EDP16-FZABR LEFT DELETING LEADING SPACE.
+  WA_E1EDP16-BSTAS = WA_TMP_E1EDP16-BSTAS.
+
+  WA_EDIDD-SEGNAM = 'E1EDP16'.
+  WA_EDIDD-SDATA = WA_E1EDP16.
+  APPEND WA_EDIDD TO DINT_EDIDD.
+  CLEAR: WA_E1EDP16, WA_EDIDD.
+ENDLOOP.
+
+*&--------------------------------------------------------------------&*
+*   Check whether we have atleast one valid JIT information segment
+*   else don't send the IDoc.
+*&--------------------------------------------------------------------&*
+READ TABLE DINT_EDIDD WITH KEY SEGNAM = 'E1EDP16'
+                                   TRANSPORTING NO FIELDS.
+IF SY-SUBRC NE 0.
+  RAISE DATA_NOT_RELEVANT_FOR_SENDING.
+ENDIF.
