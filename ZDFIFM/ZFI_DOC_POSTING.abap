@@ -1,0 +1,100 @@
+FUNCTION ZFI_DOC_POSTING.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(E_POST_TYPE) TYPE  RFPDO-RFBIFUNCT DEFAULT 'C'
+*"     REFERENCE(E_BDC_MODE) TYPE  RFPDO-ALLGAZMD DEFAULT 'N'
+*"     REFERENCE(E_MESSAGE) TYPE  EMSG_KZ_MS DEFAULT 'X'
+*"     REFERENCE(E_SET_OFF) TYPE  CHAR1 OPTIONAL
+*"  EXPORTING
+*"     VALUE(I_BUKRS) LIKE  BKPF-BUKRS
+*"     VALUE(I_GJAHR) LIKE  BKPF-GJAHR
+*"     REFERENCE(I_BELNR) LIKE  BKPF-BELNR
+*"  TABLES
+*"      T_BBKPF STRUCTURE  BBKPF
+*"      T_BBSEG STRUCTURE  BBSEG
+*"      T_BBTAX STRUCTURE  BBTAX OPTIONAL
+*"      T_BWITH STRUCTURE  BWITH OPTIONAL
+*"      T_BSELK STRUCTURE  BSELK OPTIONAL
+*"      T_BSELP STRUCTURE  BSELP OPTIONAL
+*"      T_BSELP2 STRUCTURE  ZSFIBSELP OPTIONAL
+*"      T_MESSTAB STRUCTURE  FIMSG OPTIONAL
+*"----------------------------------------------------------------------
+
+**'space' If you wish, insert the value of 'space' instead of '!' Enter into.
+** If there is a problem Please modify <PERFORM FILL_NODATA>.
+* Global data declarations
+  CLEAR: i_BELNR, GT_FIMSG, GT_FIMSG[], G_BELNR.
+*  Change the format to fit the amount of user settings.
+  PERFORM CONVERT_AMOUNT TABLES T_BBSEG T_BBTAX T_BWITH T_BSELP2.
+
+* 366 ~ 375 lines copy of 'RFBIBL01' program
+  PERFORM POST_INIT.
+* 396 ~ 409 lines copy of 'RFBIBL01' program
+  FUNCTION = e_POST_TYPE.
+
+  SORT : T_BSELK BY AGKOA,
+         T_BSELP,
+         T_BSELP2.
+
+* Add inputed T_BBKPF, T_BBSEG, T_BBTAX to TFILE.
+  ANZ_MODE = e_BDC_MODE.
+  PERFORM GET_FIELD_INFO.
+  PERFORM APPEND_TFILE_FROM_BGR00.
+  PERFORM APPEND_TFILE_FROM_BBKPF       TABLES T_BBKPF.
+  PERFORM APPEND_TFILE_FROM_BBSEG       TABLES T_BBSEG.
+  PERFORM APPEND_TFILE_FROM_BBTAX       TABLES T_BBTAX.
+  PERFORM APPEND_TFILE_FROM_BWITH       TABLES T_BWITH.
+
+*  : AP/AR setoff processing
+  IF e_SET_OFF EQ 'X'.
+    PERFORM APPEND_TFILE_FROM_BSELK_BSELP TABLES T_BSELK T_BSELP.
+  ELSE.
+    PERFORM APPEND_TFILE_FROM_BSELK TABLES T_BSELK.
+    PERFORM APPEND_TFILE_FROM_BSELP TABLES T_BSELP.
+  ENDIF.
+
+  GT_BSELP2[] = T_BSELP2[].
+
+* 419 ~ 424 lines copy of 'RFBIBL01' program
+  PERFORM LOOP_AT_TABLE_TFILE.
+* Prevent part that make batch session
+* PERFORM ERROR_PROCESSING.
+  PERFORM CALL_BI_CLOSE_ENTRY.
+* MESSAGE APPEND 20041006
+  PERFORM APPEND_MESSTAB TABLES T_MESSTAB.
+  COMMIT WORK.
+  CALL FUNCTION 'DEQUEUE_ALL'.
+
+* Document Number export
+  i_bukrs = g_bukrs.  "Company Code
+  i_BELNR = G_BELNR.  "Document Number
+  i_gjahr = g_gjahr.  "Fisical Year
+
+  CHECK e_MESSAGE EQ 'X'.
+  CALL FUNCTION 'MESSAGES_INITIALIZE'.
+  DATA : LV_CNT TYPE I,               "Message Count
+         LV_ARBGB LIKE SMESG-ARBGB,   "Message ID
+         LV_MSGTY LIKE SMESG-MSGTY.   "Message Type
+  LOOP AT T_MESSTAB.
+    LV_ARBGB = T_MESSTAB-MSGID.   "Message ID
+    LV_MSGTY = T_MESSTAB-MSGTY.   "Message Type
+    CALL FUNCTION 'MESSAGE_STORE'
+      EXPORTING
+        ARBGB = LV_ARBGB
+        MSGTY = LV_MSGTY
+        MSGV1 = T_MESSTAB-MSGV1
+        MSGV2 = T_MESSTAB-MSGV2
+        MSGV3 = T_MESSTAB-MSGV3
+        MSGV4 = T_MESSTAB-MSGV4
+        TXTNR = T_MESSTAB-MSGNO   "Message Number
+        ZEILE = LV_CNT.
+  ENDLOOP.
+
+*  IF NOT T_MESSTAB[] IS INITIAL.
+*    CALL FUNCTION 'MESSAGES_SHOW'
+*      EXPORTING
+*        SHOW_LINNO = SPACE.
+*  ENDIF.
+
+ENDFUNCTION.
