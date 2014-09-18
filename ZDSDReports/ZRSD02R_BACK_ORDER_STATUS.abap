@@ -1,0 +1,77 @@
+************************************************************************
+* Program Name      : ZRSD02R_BACK_ORDER_STATUS
+* Author            : jun ho choi
+* Creation Date     : 2003.11.21.
+* Specifications By : jun ho choi
+* Pattern           : Report 1-2
+* Development Request No : UD1K904835
+* Addl Documentation:
+* Description       : Back Order Status
+*
+* Modification Logs
+* Date       Developer    RequestNo    Description
+*
+*
+*
+************************************************************************
+REPORT ZRSD02R_BACK_ORDER_STATUS NO STANDARD PAGE HEADING
+                                 MESSAGE-ID ZMSD.
+
+
+*
+TABLES : ZSSD_BACK_OR_ST.
+
+
+*
+DATA : BEGIN OF IT_WOSUM OCCURS 0.
+       INCLUDE STRUCTURE ZTPP_WOSUM.
+DATA : END OF IT_WOSUM.
+
+DATA : IT_BACK_OR TYPE STANDARD TABLE OF ZSSD_BACK_OR_ST WITH NON-UNIQUE
+                 DEFAULT KEY INITIAL SIZE 100,
+       T_BACK_OR TYPE ZSSD_BACK_OR_ST.
+
+DATA : BEGIN OF S_WO_SER OCCURS 0,
+       SIGN(1),
+       OPTION(2),
+       LOW LIKE ZTPP_WOSUM-WO_SER,
+       HIGH LIKE ZTPP_WOSUM-WO_SER,
+       END OF S_WO_SER.
+
+DATA : W_CNT TYPE I.
+
+DATA : OK_CODE(4),
+       SAVE_OK_CODE(4).
+DATA : ALV_GRID       TYPE REF TO CL_GUI_ALV_GRID,
+       CONTAINER      TYPE REF TO CL_GUI_CUSTOM_CONTAINER.
+DATA : GS_VARIANT     TYPE DISVARIANT.
+DATA : GS_LAYOUT TYPE LVC_S_LAYO.
+
+
+*
+SELECTION-SCREEN BEGIN OF BLOCK B1 WITH FRAME TITLE TEXT-001.
+PARAMETERS : P_DATE LIKE SY-DATUM+2(4) OBLIGATORY DEFAULT SY-DATUM+2(4).
+SELECTION-SCREEN END OF BLOCK B1.
+
+
+*
+AT SELECTION-SCREEN ON P_DATE.
+  PERFORM CHECK_DATE.
+
+
+*
+START-OF-SELECTION.
+  PERFORM READ_DATA.
+
+
+*
+END-OF-SELECTION.
+  PERFORM CALL_SCREEN.
+
+
+
+
+
+INCLUDE ZRSD02R_BACK_ORDER_STATUS_F01.
+INCLUDE ZRSD02R_BACK_ORDER_STATUS_PBO.
+INCLUDE ZRSD02R_BACK_ORDER_STATUS_PAI.

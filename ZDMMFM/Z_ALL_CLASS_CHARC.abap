@@ -1,0 +1,45 @@
+FUNCTION Z_ALL_CLASS_CHARC.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     REFERENCE(OBJECT) LIKE  MARA-MATNR
+*"     REFERENCE(CTYPE) LIKE  RMCLF-KLART
+*"  TABLES
+*"      VAL_TABLE STRUCTURE  ZSPP_VIN_VALUE
+*"  EXCEPTIONS
+*"      NO_DATA
+*"      ERROR_MODE
+*"      ERROR_OBJECT
+*"      ERROR_VALUE
+*"----------------------------------------------------------------------
+
+  DATA: L_OBJECT LIKE EQUI-EQUNR.
+
+  CASE CTYPE.
+    WHEN '001'  .
+      SELECT SINGLE MATNR INTO L_OBJECT
+        FROM MARA
+       WHERE MATNR = OBJECT.
+      IF SY-SUBRC NE 0.
+        LOOP AT VAL_TABLE.
+          VAL_TABLE-ZFLAG = 'E'.
+          MODIFY VAL_TABLE TRANSPORTING ZFLAG.
+        ENDLOOP.
+        RAISE ERROR_OBJECT.
+      ENDIF.
+    WHEN '002'  .
+      SELECT SINGLE EQUNR INTO L_OBJECT
+        FROM EQUI
+       WHERE EQUNR = OBJECT.
+
+      IF SY-SUBRC NE 0.
+        LOOP AT VAL_TABLE.
+          VAL_TABLE-ZFLAG = 'E'.
+          MODIFY VAL_TABLE TRANSPORTING ZFLAG.
+        ENDLOOP.
+        RAISE ERROR_OBJECT.
+      ENDIF.
+  ENDCASE.
+  PERFORM GET_VALUES TABLES VAL_TABLE USING OBJECT CTYPE.
+
+ENDFUNCTION.

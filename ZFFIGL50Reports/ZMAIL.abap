@@ -1,0 +1,165 @@
+*&---------------------------------------------------------------------*
+*& Report  ZFIMAIL                                                     *
+*&---------------------------------------------------------------------*
+*& Send message...                                        *
+*&---------------------------------------------------------------------*
+REPORT ZMAIL NO STANDARD PAGE HEADING.
+
+TABLES : SOODK, USR01.
+
+* DOCUMENT_DATA
+DATA : BEGIN OF DOC_DATA_TMP.
+        INCLUDE STRUCTURE SODOCCHGI1.
+DATA : END OF DOC_DATA_TMP.
+
+* OBJECT_HEADER
+DATA : BEGIN OF OBJECT_HEADER_TMP OCCURS 0.
+        INCLUDE STRUCTURE SOLISTI1.
+DATA : END OF OBJECT_HEADER_TMP.
+
+* OBJECT_CONTENT
+DATA: BEGIN OF OBJCONT_TMP OCCURS 0.
+        INCLUDE STRUCTURE SOLISTI1.
+DATA: END OF OBJCONT_TMP.
+
+* OBJECT_PARA
+DATA: BEGIN OF OBJPARA_TMP OCCURS 0.
+        INCLUDE STRUCTURE SOPARAI1.
+DATA: END OF OBJPARA_TMP.
+
+* OBJECT_PARB
+DATA: BEGIN OF OBJPARB_TMP OCCURS 0.
+        INCLUDE STRUCTURE SOPARBI1.
+DATA: END OF OBJPARB_TMP.
+
+* RECEIVERS
+DATA: BEGIN OF REC_TAB_TMP OCCURS 0.
+        INCLUDE STRUCTURE SOMLRECI1.
+DATA: END OF REC_TAB_TMP.
+*----------------------------------------------------------------------*
+SELECTION-SCREEN BEGIN OF BLOCK B1 WITH FRAME TITLE TEXT-001.
+SELECT-OPTIONS : S_RECEIV       FOR    USR01-BNAME.
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN ULINE.
+PARAMETERS     : SEND-H01(250)  TYPE  C DEFAULT SPACE.
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN ULINE.
+SELECTION-SCREEN SKIP 1.
+PARAMETERS     : SEND-B01(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B02(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B03(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B04(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B05(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B06(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B07(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B08(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B09(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B10(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B11(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B12(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B20(250)  TYPE   C DEFAULT SPACE,
+                 SEND-B21(250)  TYPE   C DEFAULT SPACE.
+SELECTION-SCREEN SKIP 1.
+PARAMETERS     : P_EXP  TYPE  C AS CHECKBOX DEFAULT 'X'.
+SELECTION-SCREEN END OF BLOCK B1.
+*----------------------------------------------------------------------*
+START-OF-SELECTION.
+  PERFORM CALL_HR_CC1_SEND_MAIL.
+
+END-OF-SELECTION.
+*&---------------------------------------------------------------------*
+*&      Form  CALL_HR_CC1_SEND_MAIL
+*&---------------------------------------------------------------------*
+FORM CALL_HR_CC1_SEND_MAIL.
+  CLEAR OBJCONT_TMP.
+  REFRESH OBJCONT_TMP.            "?????
+  MOVE SEND-B01 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B02 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B03 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B04 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B05 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B06 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B07 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B08 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B09 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B10 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B11 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B12 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B20 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  MOVE SEND-B21 TO OBJCONT_TMP.
+  APPEND OBJCONT_TMP.
+  CLEAR SOODK.
+  SOODK-OBJTP = 'RAW'.                   "???????
+  CLEAR DOC_DATA_TMP.
+  DOC_DATA_TMP-OBJ_LANGU  = SY-LANGU.    "??????
+  DOC_DATA_TMP-OBJ_NAME  = TEXT-001. "?? ?????? ????? ??
+*  DOC_DATA_TMP-OBJ_DESCR  = TEXT-HR1.
+  DOC_DATA_TMP-OBJ_DESCR  = SEND-H01.   "??
+  DOC_DATA_TMP-PROC_TYPE  = 'R'.
+  DOC_DATA_TMP-PROC_NAME  = 'RPAFRV00'.
+  DOC_DATA_TMP-SENSITIVTY = 'F'.       "funktional
+  REFRESH OBJECT_HEADER_TMP.
+*  MOVE   SEND-H01  TO   OBJECT_HEADER_TMP.
+*  APPEND OBJECT_HEADER_TMP.
+*  Empf?ger und Empf?gerattribute zur?ksetzen
+  CLEAR REC_TAB_TMP.
+  REFRESH REC_TAB_TMP.
+*  Empf?ger und Empf?gerattribute setzen
+*  SELECT SINGLE * FROM CC1PAR WHERE KANAL = '1'.
+*  IF SY-SUBRC = 0  AND  CC1PAR-UNAME NE SPACE.
+*    REC_TAB_TMP-RECEIVER = CC1PAR-UNAME.
+  SELECT BNAME INTO REC_TAB_TMP-RECEIVER FROM USR01
+   WHERE BNAME IN S_RECEIV.
+    REC_TAB_TMP-REC_TYPE   = 'B'.      "SAP-User
+*     rec_tab_tmp-to_do_expl = 'X'.       "Mail muss erledigt werden
+    REC_TAB_TMP-TO_DO_EXPL = ' '.      "Mail muss erledigt werden
+    IF  P_EXP   =   'X'.
+        REC_TAB_TMP-EXPRESS    = 'X'.      "Express-Mail
+    ELSE.
+        REC_TAB_TMP-EXPRESS    = ' '.
+    ENDIF.
+    APPEND REC_TAB_TMP.
+  ENDSELECT.
+  CALL FUNCTION 'SO_NEW_DOCUMENT_SEND_API1'
+       EXPORTING
+            DOCUMENT_DATA              = DOC_DATA_TMP
+            DOCUMENT_TYPE              = SOODK-OBJTP
+            PUT_IN_OUTBOX              = SPACE
+*          IMPORTING
+*               sent_to_all                = send_ok
+*               new_object_id              = obj_id
+       TABLES
+            OBJECT_HEADER              = OBJECT_HEADER_TMP
+            OBJECT_CONTENT             = OBJCONT_TMP
+            OBJECT_PARA                = OBJPARA_TMP
+            OBJECT_PARB                = OBJPARB_TMP
+            RECEIVERS                  = REC_TAB_TMP
+       EXCEPTIONS
+            TOO_MANY_RECEIVERS         = 01
+            DOCUMENT_NOT_SENT          = 02
+            DOCUMENT_TYPE_NOT_EXIST    = 03
+            OPERATION_NO_AUTHORIZATION = 04
+            PARAMETER_ERROR            = 05
+            X_ERROR                    = 06
+            ENQUEUE_ERROR              = 07.
+  IF SY-SUBRC NE 0.
+    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ELSE.
+    MESSAGE S398(00) WITH 'Sended'.
+  ENDIF.
+
+ENDFORM.                    " CALL_HR_CC1_SEND_MAIL

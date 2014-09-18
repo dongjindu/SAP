@@ -1,0 +1,79 @@
+************************************************************************
+* Program Name      : ZRSD13R_NON_DEA_ALL_ST
+* Author            : jun ho choi
+* Creation Date     : 2003.12.01.
+* Specifications By : jun ho choi
+* Pattern           : Report 1-2
+* Development Request No : UD1K904835
+* Addl Documentation:
+* Description       : Non dealer allocation status
+*
+* Modification Logs
+* Date       Developer    RequestNo    Description
+*
+*
+*
+************************************************************************
+REPORT ZRSD13R_NON_DEA_ALL_ST NO STANDARD PAGE HEADING
+                              MESSAGE-ID ZMSD.
+
+
+*
+TABLES : ZSSD_NON_DEALER.
+
+
+*
+DATA : BEGIN OF IT_AUSP OCCURS 0.
+       INCLUDE STRUCTURE AUSP.
+DATA : END OF IT_AUSP.
+
+RANGES R_ATINN FOR AUSP-ATINN OCCURS 0.
+
+DATA : BEGIN OF IT_CABN OCCURS 0,
+       ATINN LIKE CABN-ATINN,
+       ATNAM LIKE CABN-ATNAM,
+       END OF IT_CABN.
+
+DATA : IT_NON_DEA TYPE STANDARD TABLE OF ZSSD_NON_DEALER WITH NON-UNIQUE
+                 DEFAULT KEY INITIAL SIZE 100,
+       T_NON_DEA TYPE ZSSD_NON_DEALER.
+
+DATA : W_CNT TYPE I,
+       W_ATINN LIKE CABN-ATINN,
+       W_ATNAM LIKE CABN-ATNAM.
+
+FIELD-SYMBOLS : <FS>.
+DATA : FIELD(30).
+
+DATA : OK_CODE(4),
+       SAVE_OK_CODE(4).
+DATA : ALV_GRID       TYPE REF TO CL_GUI_ALV_GRID,
+       CONTAINER      TYPE REF TO CL_GUI_CUSTOM_CONTAINER.
+DATA : GS_VARIANT     TYPE DISVARIANT.
+DATA : GS_LAYOUT TYPE LVC_S_LAYO.
+
+
+*
+SELECTION-SCREEN BEGIN OF BLOCK B1 WITH FRAME TITLE TEXT-001.
+PARAMETERS : P_DATE LIKE SY-DATUM DEFAULT SY-DATUM NO-DISPLAY.
+SELECTION-SCREEN END OF BLOCK B1.
+
+
+*
+START-OF-SELECTION.
+  PERFORM INIT_CABN.
+  PERFORM READ_DATA.
+  PERFORM MODIFY_DATA.
+
+
+*
+END-OF-SELECTION.
+  PERFORM CALL_SCREEN.
+
+
+
+
+
+INCLUDE ZRSD13R_NON_DEA_ALL_ST_F01.
+INCLUDE ZRSD13R_NON_DEA_ALL_ST_PBO.
+INCLUDE ZRSD13R_NON_DEA_ALL_ST_PAI.

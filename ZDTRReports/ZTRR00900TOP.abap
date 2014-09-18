@@ -1,0 +1,108 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZTRR00900TOP
+*&---------------------------------------------------------------------*
+TABLES: ZTTR0008,
+        TKCHH,
+        t001.
+
+*Define
+DEFINE ICLEAR.
+  CLEAR : &1, &1[].
+END-OF-DEFINITION.
+
+DEFINE IAPPEND.
+  APPEND : &1.
+  CLEAR  : &1.
+END-OF-DEFINITION.
+
+DEFINE ICOLLECT.
+  COLLECT : &1.
+  CLEAR   : &1.
+END-OF-DEFINITION.
+
+DATA: BEGIN OF HIER_TB OCCURS 100.
+        INCLUDE STRUCTURE TKCHS.
+DATA: END OF HIER_TB.
+
+DATA: BEGIN OF HIER_DB OCCURS 100.
+        INCLUDE STRUCTURE TKCHA.
+DATA: END OF HIER_DB.
+
+DATA : ACT     LIKE  FDSR OCCURS 0 WITH HEADER LINE,
+       DATE    LIKE  SY-DATUM OCCURS 0 WITH HEADER LINE.
+
+CLASS LCL_APPLICATION DEFINITION DEFERRED.
+
+TYPES: ITEM_TABLE_TYPE LIKE STANDARD TABLE OF MTREEITM
+       WITH DEFAULT KEY.
+
+DATA : G_CUSTOM_CONTAINER  TYPE REF TO CL_GUI_CUSTOM_CONTAINER,
+       G_GRID              TYPE REF TO CL_GUI_COLUMN_TREE,
+       GT_NODE_TABLE       TYPE TREEV_NTAB WITH HEADER LINE,
+       GT_ITEM_TABLE       TYPE ITEM_TABLE_TYPE WITH HEADER LINE,
+       GS_HIERARCHY_HEADER TYPE TREEV_HHDR.
+DATA : G_EVENTS            TYPE CNTL_SIMPLE_EVENTS.
+DATA : G_EVENT             TYPE CNTL_SIMPLE_EVENT.
+DATA : G_APPLICATION       TYPE REF TO LCL_APPLICATION.
+DATA : OK_CODE LIKE SY-UCOMM.
+
+DATA : FIRST_MONTH(1)       VALUE  'D',
+       SECOND_MONTH(1)      VALUE  'M',
+       THIRD_MONTH(1)       VALUE  'M',
+       LATER(1)             VALUE  ' ',
+       ALL_DAY              VALUE  SPACE,
+       G_WAERS              LIKE T001-WAERS,
+       FIELDNAME(30),
+       G_NODE_KEY_TABLE     TYPE TREEV_NKS WITH HEADER LINE.
+
+CONSTANTS : C_DAILY         TYPE ZPLAN VALUE '1',
+            C_MONTHLY       TYPE ZPLAN VALUE '2',
+            C_QUARTERLY     TYPE ZPLAN VALUE '3',
+            C_YEARLY        TYPE ZPLAN VALUE '4'.
+*            C_BEGIN(12)                VALUE 'Begin',
+*            C_END(12)                  VALUE 'End'.
+
+
+RANGES: r_hkont    FOR bsis-hkont  OCCURS 0.
+
+*&----------------------------------------------------------------------
+*&     MACRO DEFINITION.
+*&----------------------------------------------------------------------
+*___Macro Definition
+DEFINE make_ranges.
+  move:  'I'     to &2-sign,
+         'EQ'    to &2-option,
+         &1      to &2-low.
+  append &2.
+END-OF-DEFINITION.
+
+*---------------------------------------------------------------------*
+*  Selection Screen                                                   *
+*---------------------------------------------------------------------*
+SELECTION-SCREEN BEGIN OF BLOCK B1 WITH FRAME TITLE  TEXT-T01.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(31) text-h01.
+PARAMETERS: p_bukrs  LIKE t001-bukrs   OBLIGATORY  default 'H201'.
+SELECTION-SCREEN COMMENT 52(40) p_butxt.
+SELECTION-SCREEN END OF LINE.
+
+PARAMETERS: p_gjahr LIKE ZTTR0008-gjahr OBLIGATORY default sy-datum(4).
+
+SELECT-OPTIONS : S_DATUM  FOR ZTTR0008-DATUM OBLIGATORY.
+SELECTION-SCREEN skip 1.
+
+SELECTION-SCREEN BEGIN OF BLOCK B2 WITH FRAME TITLE TEXT-T02.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 01(09) TEXT-T21 FOR FIELD P_SKALV. "Skalierung
+PARAMETERS: P_SKALV TYPE TS70SKAL_VOR  DEFAULT '3'.
+SELECTION-SCREEN COMMENT 23(15) TEXT-T22 FOR FIELD P_DECIM. "Nachkommast
+PARAMETERS: P_DECIM TYPE TS70SKAL_NACH DEFAULT '0'.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN END OF BLOCK B2.
+
+SELECTION-SCREEN BEGIN OF BLOCK B3 WITH FRAME TITLE TEXT-T03.
+PARAMETERS     : P_HIER  LIKE TKCHH-ID2 DEFAULT 'H02'
+                       VISIBLE LENGTH 3 NO-DISPLAY.
+SELECTION-SCREEN END OF BLOCK B3.
+SELECTION-SCREEN END   OF BLOCK B1.

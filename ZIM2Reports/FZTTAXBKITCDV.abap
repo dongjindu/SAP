@@ -1,0 +1,9 @@
+
+DATA: UPD_ICDTXT_ZTTAXBKIT       TYPE C.
+DATA: BEGIN OF ICDTXT_ZTTAXBKIT       OCCURS 20.
+        INCLUDE STRUCTURE CDTXT.
+DATA: END OF ICDTXT_ZTTAXBKIT      .
+
+TABLES: *ZTTAXBKIT                     , ZTTAXBKIT                     .
+DATA: UPD_ZTTAXBKIT                      TYPE C.
+

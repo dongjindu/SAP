@@ -1,0 +1,753 @@
+************************************************************************
+* Author                 : jun ho choi
+* Creation Date          : 2003-11-17
+* Specifications By      :
+* Development Request No : UD1K901594
+* Pattern                : 5-2
+* Addl documentation     :
+* Description            : order status report for HMA/HAC/GLOVIS
+*
+*
+*
+* Modification Log
+* Date       Developer    Request ID Description
+* 10/25/2004  Shiva        UD1K912648   Formatted the file to place the
+*                                       fields in correct position.
+*12/10/2004   chris        UD1K913472   Excluding test cars
+************************************************************************
+REPORT ZISD16U_ORDER_STATUS NO STANDARD PAGE HEADING
+                            MESSAGE-ID ZMSD.
+
+
+*
+TABLES : ZTPP_WOSUM,
+         ZTPP_PMT07JB_A,
+         CABN,
+         AUSP.
+
+
+*
+DATA : BEGIN OF IT_WOSUM OCCURS 0.
+       INCLUDE STRUCTURE ZTPP_WOSUM.
+DATA : END OF IT_WOSUM.
+
+DATA : BEGIN OF IT_DOWNFILE OCCURS 0,
+       RECORD(157),
+       END OF IT_DOWNFILE.
+
+DATA : BEGIN OF IT_DOWNFILE_HMA OCCURS 0,
+       RECORD(157),
+       END OF IT_DOWNFILE_HMA.
+
+DATA : BEGIN OF IT_DOWNFILE_HAC OCCURS 0,
+       RECORD(157),
+       END OF IT_DOWNFILE_HAC.
+
+DATA : BEGIN OF IT_AUSP OCCURS 0,
+       OBJEK LIKE AUSP-OBJEK,
+       ATINN LIKE AUSP-ATINN,
+       ATNAM LIKE CABN-ATNAM,
+       ATWRT LIKE AUSP-ATWRT,
+       ATFLV LIKE AUSP-ATFLV,
+       END OF IT_AUSP.
+
+DATA : BEGIN OF IT_PMT07JB_A OCCURS 0,
+       SQDT LIKE ZTPP_PMT07JB_A-SQDT,
+       PQTY LIKE ZTPP_PMT07JB_A-PQTY,
+       END OF IT_PMT07JB_A.
+
+DATA : BEGIN OF S_WO_SER OCCURS 0,
+       SIGN(1),
+       OPTION(2),
+       LOW LIKE ZTPP_WOSUM-WO_SER,
+       HIGH LIKE ZTPP_WOSUM-WO_SER,
+       END OF S_WO_SER.
+
+DATA : BEGIN OF S_ATINN OCCURS 0,
+       SIGN(1),
+       OPTION(2),
+       LOW LIKE AUSP-ATINN,
+       HIGH LIKE AUSP-ATINN,
+       END OF S_ATINN.
+
+DATA : BEGIN OF IT_CABN OCCURS 0,
+       ATINN LIKE CABN-ATINN,
+       ATNAM LIKE CABN-ATNAM,
+       END OF IT_CABN.
+
+DATA : W_CNT TYPE I,
+       W_N_9(9) TYPE N,
+       W_N_8(8) TYPE N.
+
+DATA : W_LASTDAY(2) TYPE N,
+       W_POS TYPE I,
+       W_DIST LIKE ZTPP_PMT07JB_A-DIST,
+       " W_DSN_B(20) VALUE '/usr/sap/EDI_SAP/',
+       W_DSN(90).
+
+DATA : VARIANT LIKE INDX-SRTFD VALUE 'ISD16_01'.
+
+
+*
+SELECTION-SCREEN BEGIN OF BLOCK B1 WITH FRAME TITLE TEXT-001.
+*PARAMETERS : P_DATE LIKE SY-DATUM+2(4) NO-DISPLAY.
+PARAMETERS : P_DATE LIKE SY-DATUM+2(4) DEFAULT SY-DATUM+2(4) OBLIGATORY.
+SELECTION-SCREEN END OF BLOCK B1.
+
+
+*
+START-OF-SELECTION.
+  MESSAGE i000 WITH 'DO NOT USE THIS PROGRAM'.
+  LEAVE PROGRAM.
+
+  PERFORM GET_DATA.
+  PERFORM PROCESS_DATA.
+
+
+*
+END-OF-SELECTION.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+FORM GET_DATA.
+  IMPORT P_DATE FROM DATABASE INDX(ZS) ID VARIANT.
+
+  PERFORM INIT_DATE.
+
+  SELECT *
+         INTO TABLE IT_WOSUM
+         FROM ZTPP_WOSUM
+        WHERE WO_SER IN S_WO_SER AND ".
+* REQUESTED BY CATHERINE S. CHANGED BY CHRIS LI
+             ( NATION = 'B28' OR
+               NATION = 'B06' ) AND
+             ( DEALER = 'AA' OR
+               DEALER = 'AB' ).
+* END OF CHANGE ON 12/10/2004
+
+  LOOP AT IT_WOSUM.
+    IF IT_WOSUM-WO_SER+1(4) < P_DATE AND
+       IT_WOSUM-MODQTY = IT_WOSUM-SEQQTY.
+       DELETE IT_WOSUM INDEX SY-TABIX.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.                    " GET_DATA
+*&---------------------------------------------------------------------*
+*&      Form  INIT_DATE
+*&---------------------------------------------------------------------*
+FORM INIT_DATE.
+  S_WO_SER-SIGN = 'I'.
+  S_WO_SER-OPTION = 'BT'.
+  CONCATENATE 'E' '0000' '000' INTO S_WO_SER-LOW.
+  CONCATENATE 'E' P_DATE 'ZZZ' INTO S_WO_SER-HIGH.
+  APPEND S_WO_SER.
+
+  CONCATENATE 'D' '0000' '000' INTO S_WO_SER-LOW.
+  CONCATENATE 'D' P_DATE 'ZZZ' INTO S_WO_SER-HIGH.
+  APPEND S_WO_SER.
+
+* VEHICLE MASTER
+  S_ATINN-SIGN = 'I'. S_ATINN-OPTION = 'EQ'.
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_ORDER_ZONE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_REGION_PORT'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_COLOR_SER'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_FLEET'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_MANUAL_ORDER'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_VIN'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_SEQUENCE_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_RP01_ACTUAL_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_RP02_ACTUAL_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_RP07_ACTUAL_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_RP18_ACTUAL_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_RP19_ACTUAL_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+
+  SELECT SINGLE ATINN INTO CABN-ATINN
+         FROM CABN
+        WHERE ATNAM EQ 'P_RP20_ACTUAL_DATE'.
+  S_ATINN-LOW = CABN-ATINN. APPEND S_ATINN.
+  IT_CABN-ATINN = CABN-ATINN.
+  IT_CABN-ATNAM = CABN-ATNAM.
+  APPEND IT_CABN.
+ENDFORM.                    " INIT_DATE
+*&---------------------------------------------------------------------*
+*&      Form  PROCESS_DATA
+*&---------------------------------------------------------------------*
+FORM PROCESS_DATA.
+  DESCRIBE TABLE IT_WOSUM LINES W_CNT.
+  IF W_CNT = 0.
+    MESSAGE I000 WITH TEXT-M01.
+    STOP.
+  ENDIF.
+
+  SORT IT_WOSUM BY NATION DEALER WO_SER EXTC INTC.
+  REFRESH IT_DOWNFILE. CLEAR IT_DOWNFILE.
+  LOOP AT IT_WOSUM.
+    CLEAR W_N_9.
+
+    PERFORM SAPGUI_PROGRESS_INDICATOR USING 1.
+
+    PERFORM R2.
+    PERFORM R3.
+
+    IF IT_WOSUM-WO_SER+1(4) = P_DATE.
+      PERFORM R4.
+      PERFORM R5.
+    ENDIF.
+  ENDLOOP.
+
+  PERFORM DOWNLOAD_FILE.
+ENDFORM.                    " PROCESS_DATA
+*&---------------------------------------------------------------------*
+*&      Form  R2
+*&---------------------------------------------------------------------*
+FORM R2.
+  IT_DOWNFILE-RECORD+0(3)    = 'O1D'.
+  IT_DOWNFILE-RECORD+3(3)    = IT_WOSUM-NATION.
+  IT_DOWNFILE-RECORD+6(3)    = IT_WOSUM-DEALER.
+  IT_DOWNFILE-RECORD+9(10)   = IT_WOSUM-WO_SER.
+  IT_DOWNFILE-RECORD+19(3)   = IT_WOSUM-EXTC.
+  IT_DOWNFILE-RECORD+22(3)   = IT_WOSUM-INTC.
+  IT_DOWNFILE-RECORD+25(9)   = IT_WOSUM-MODQTY.
+  IT_DOWNFILE-RECORD+34(9)   = IT_WOSUM-SEQQTY.
+  IT_DOWNFILE-RECORD+43(9)   = IT_WOSUM-RP01TQ.
+  IT_DOWNFILE-RECORD+52(9)   = IT_WOSUM-RP02TQ.
+  IT_DOWNFILE-RECORD+61(9)   = IT_WOSUM-RP06TQ.
+  IT_DOWNFILE-RECORD+70(9)   = IT_WOSUM-RP08TQ.
+  IT_DOWNFILE-RECORD+79(9)   = IT_WOSUM-RP09TQ.
+  IT_DOWNFILE-RECORD+88(9)   = IT_WOSUM-RP10TQ.
+  IT_DOWNFILE-RECORD+97(9)   = IT_WOSUM-RP11TQ.
+  IT_DOWNFILE-RECORD+106(9)  = IT_WOSUM-RP15TQ.
+
+  APPEND IT_DOWNFILE.
+  IF IT_WOSUM-NATION = 'B28'.
+    IT_DOWNFILE_HMA = IT_DOWNFILE.
+    APPEND IT_DOWNFILE_HMA. CLEAR IT_DOWNFILE_HMA.
+  ELSEIF IT_WOSUM-NATION = 'B06'.
+    IT_DOWNFILE_HAC = IT_DOWNFILE.
+    APPEND IT_DOWNFILE_HAC. CLEAR IT_DOWNFILE_HAC.
+  ENDIF.
+  CLEAR IT_DOWNFILE.
+
+  W_N_9 = W_N_9 + 1.
+ENDFORM.                    " R2
+*&---------------------------------------------------------------------*
+*&      Form  R3
+*&---------------------------------------------------------------------*
+FORM R3.
+  DATA : W_OBJEK LIKE AUSP-OBJEK.
+
+  PERFORM MAKE_VM.
+
+  READ TABLE IT_AUSP INDEX 1.
+  W_OBJEK = IT_AUSP-OBJEK.
+
+  LOOP AT IT_AUSP.
+  IF W_OBJEK <> IT_AUSP-OBJEK.
+    IT_DOWNFILE-RECORD+0(3)    = 'O2D'.
+    IT_DOWNFILE-RECORD+3(3)    = IT_WOSUM-NATION.
+    IT_DOWNFILE-RECORD+6(2)    = ''. "IT_WOSUM-DEALER.
+
+    IT_DOWNFILE-RECORD+8(5)    = IT_WOSUM-DEALER.
+    IT_DOWNFILE-RECORD+13(4)   = IT_WOSUM-WO_SER+1(2).
+    IT_DOWNFILE-RECORD+17(2)   = IT_WOSUM-WO_SER+3(2).
+    IT_DOWNFILE-RECORD+19(1)   = IT_WOSUM-WO_SER+5(1).
+
+    IT_DOWNFILE-RECORD+28(01)  = IT_WOSUM-WO_SER+2(1).
+    IT_DOWNFILE-RECORD+29(02)  = IT_WOSUM-WO_SER+3(2).
+    IT_DOWNFILE-RECORD+31(03)  = IT_WOSUM-WO_SER+6(3).
+
+    IT_DOWNFILE-RECORD+36(10)  = IT_WOSUM-SALES.
+    IT_DOWNFILE-RECORD+46(12)  = IT_WOSUM-FSC+6(12).
+    IT_DOWNFILE-RECORD+58(3)   = IT_WOSUM-EXTC.
+    IT_DOWNFILE-RECORD+61(3)   = IT_WOSUM-INTC.
+
+    IT_DOWNFILE-RECORD+66(2)   = ''.
+    IT_DOWNFILE-RECORD+68(17)  = ''.
+
+    IT_DOWNFILE-RECORD+92(1)   = ''.
+    IT_DOWNFILE-RECORD+93(8)   = IT_WOSUM-WOCREDATE.
+
+    APPEND IT_DOWNFILE.
+    IF IT_WOSUM-NATION = 'B28'.
+      IT_DOWNFILE_HMA = IT_DOWNFILE.
+      APPEND IT_DOWNFILE_HMA. CLEAR IT_DOWNFILE_HMA.
+    ELSEIF IT_WOSUM-NATION = 'B06'.
+      IT_DOWNFILE_HAC = IT_DOWNFILE.
+      APPEND IT_DOWNFILE_HAC. CLEAR IT_DOWNFILE_HAC.
+    ENDIF.
+    CLEAR IT_DOWNFILE.
+    W_OBJEK = IT_AUSP-OBJEK.
+    W_N_9 = W_N_9 + 1.
+  ENDIF.
+
+  CASE IT_AUSP-ATNAM.
+  WHEN 'P_ORDER_ZONE'.
+    IT_DOWNFILE-RECORD+20(4)   = IT_AUSP-ATWRT.
+  WHEN 'P_REGION_PORT'.
+    IT_DOWNFILE-RECORD+24(2)   = IT_AUSP-ATWRT+0(2).
+    IT_DOWNFILE-RECORD+26(2)   = IT_AUSP-ATWRT+2(2).
+  WHEN 'P_COLOR_SER'.
+    IT_DOWNFILE-RECORD+34(02)  = IT_AUSP-ATWRT.
+  WHEN 'P_FLEET'.
+    IT_DOWNFILE-RECORD+64(1)   = IT_AUSP-ATWRT.
+  WHEN 'P_MANUAL_ORDER'.
+    IT_DOWNFILE-RECORD+65(1)   = IT_AUSP-ATWRT.
+  WHEN 'P_VIN'.
+    IT_DOWNFILE-RECORD+75(17)  = IT_AUSP-ATWRT.
+  WHEN 'P_SEQUENCE_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+101(8)  = W_N_8.
+  WHEN 'P_RP01_ACTUAL_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+109(8)  = W_N_8.
+  WHEN 'P_RP02_ACTUAL_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+117(8)  = W_N_8.
+  WHEN 'P_RP07_ACTUAL_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+125(8)  = W_N_8.
+  WHEN 'P_RP18_ACTUAL_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+133(8)  = W_N_8.
+  WHEN 'P_RP19_ACTUAL_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+141(8)  = W_N_8.
+  WHEN 'P_RP20_ACTUAL_DATE'.
+    W_N_8 = IT_AUSP-ATFLV.
+    IT_DOWNFILE-RECORD+149(8)  = W_N_8.
+  ENDCASE.
+
+  ENDLOOP.
+  IF SY-SUBRC = 0.
+    IT_DOWNFILE-RECORD+0(3)    = 'O2D'.
+    IT_DOWNFILE-RECORD+3(3)    = IT_WOSUM-NATION.
+    IT_DOWNFILE-RECORD+6(2)    = IT_WOSUM-DEALER.
+
+    IT_DOWNFILE-RECORD+8(5)    = IT_WOSUM-DEALER.
+    IT_DOWNFILE-RECORD+13(4)   = IT_WOSUM-WO_SER+1(2).
+    IT_DOWNFILE-RECORD+17(2)   = IT_WOSUM-WO_SER+3(2).
+    IT_DOWNFILE-RECORD+19(1)   = IT_WOSUM-WO_SER+5(1).
+
+    IT_DOWNFILE-RECORD+28(01)  = IT_WOSUM-WO_SER+2(1).
+    IT_DOWNFILE-RECORD+29(02)  = IT_WOSUM-WO_SER+3(2).
+    IT_DOWNFILE-RECORD+31(03)  = IT_WOSUM-WO_SER+6(3).
+
+    IT_DOWNFILE-RECORD+36(10)  = IT_WOSUM-SALES.
+    IT_DOWNFILE-RECORD+46(12)  = IT_WOSUM-FSC+6(12).
+    IT_DOWNFILE-RECORD+58(3)   = IT_WOSUM-EXTC.
+    IT_DOWNFILE-RECORD+61(3)   = IT_WOSUM-INTC.
+
+    IT_DOWNFILE-RECORD+66(2)   = ''.
+    IT_DOWNFILE-RECORD+68(17)  = ''.
+
+    IT_DOWNFILE-RECORD+92(1)   = ''.
+    IT_DOWNFILE-RECORD+93(8)   = IT_WOSUM-WOCREDATE.
+
+    APPEND IT_DOWNFILE.
+    IF IT_WOSUM-NATION = 'B28'.
+      IT_DOWNFILE_HMA = IT_DOWNFILE.
+      APPEND IT_DOWNFILE_HMA. CLEAR IT_DOWNFILE_HMA.
+    ELSEIF IT_WOSUM-NATION = 'B06'.
+      IT_DOWNFILE_HAC = IT_DOWNFILE.
+      APPEND IT_DOWNFILE_HAC. CLEAR IT_DOWNFILE_HAC.
+    ENDIF.
+    CLEAR IT_DOWNFILE.
+    W_OBJEK = IT_AUSP-OBJEK.
+    W_N_9 = W_N_9 + 1.
+  ENDIF.
+ENDFORM.                    " R3
+*&---------------------------------------------------------------------*
+*&      Form  R4
+*&---------------------------------------------------------------------*
+FORM R4.
+  CALL FUNCTION 'RE_LAST_DAY_OF_MONTH'
+    EXPORTING
+      I_DATUM        = SY-DATUM
+    IMPORTING
+      E_TT           = W_LASTDAY.
+
+  IT_DOWNFILE-RECORD+0(3)    = 'O3D'.
+  IT_DOWNFILE-RECORD+3(28)   = ''.
+
+  DO 50 TIMES. "CHECK ENDLESS LOOP
+    IF W_LASTDAY < SY-DATUM+6(2).
+      EXIT.
+    ENDIF.
+    W_POS = W_LASTDAY * 4 + 27.
+    IT_DOWNFILE-RECORD+W_POS(2)   = SY-DATUM+4(2).
+    W_POS = W_POS + 2.
+    IT_DOWNFILE-RECORD+W_POS(2)   = W_LASTDAY.
+    W_LASTDAY = W_LASTDAY - 1.
+  ENDDO.
+
+  APPEND IT_DOWNFILE.
+  IF IT_WOSUM-NATION = 'B28'.
+    IT_DOWNFILE_HMA = IT_DOWNFILE.
+    APPEND IT_DOWNFILE_HMA. CLEAR IT_DOWNFILE_HMA.
+  ELSEIF IT_WOSUM-NATION = 'B06'.
+    IT_DOWNFILE_HAC = IT_DOWNFILE.
+    APPEND IT_DOWNFILE_HAC. CLEAR IT_DOWNFILE_HAC.
+  ENDIF.
+  CLEAR IT_DOWNFILE.
+
+  W_N_9 = W_N_9 + 1.
+ENDFORM.                    " R4
+*&---------------------------------------------------------------------*
+*&      Form  R5
+*&---------------------------------------------------------------------*
+FORM R5.
+  CONCATENATE IT_WOSUM-NATION IT_WOSUM-DEALER INTO W_DIST.
+
+  REFRESH : IT_PMT07JB_A. CLEAR : IT_PMT07JB_A.
+
+  SELECT *
+         FROM ZTPP_PMT07JB_A
+        WHERE ORDR EQ IT_WOSUM-WO_SER
+        AND   DIST EQ W_DIST
+        AND   EXTC EQ IT_WOSUM-EXTC
+        AND   INTC EQ IT_WOSUM-INTC.
+    IT_PMT07JB_A-SQDT = ZTPP_PMT07JB_A-SQDT.
+    IT_PMT07JB_A-PQTY = ZTPP_PMT07JB_A-PQTY.
+    COLLECT IT_PMT07JB_A. CLEAR IT_PMT07JB_A.
+  ENDSELECT.
+
+  IT_DOWNFILE-RECORD+0(3)    = 'O4D'.
+  IT_DOWNFILE-RECORD+3(28)   = 'Planned Schedule -->'.
+
+  LOOP AT IT_PMT07JB_A.
+    IF IT_PMT07JB_A-SQDT+0(6) =  SY-DATUM+0(6) AND
+       IT_PMT07JB_A-SQDT+6(2) >= SY-DATUM+6(2).
+      W_POS = IT_PMT07JB_A-SQDT+6(2) * 4 + 27.
+      IT_DOWNFILE-RECORD+W_POS(4)   = IT_PMT07JB_A-PQTY.
+    ENDIF.
+  ENDLOOP.
+
+  APPEND IT_DOWNFILE.
+  IF IT_WOSUM-NATION = 'B28'.
+    IT_DOWNFILE_HMA = IT_DOWNFILE.
+    APPEND IT_DOWNFILE_HMA. CLEAR IT_DOWNFILE_HMA.
+  ELSEIF IT_WOSUM-NATION = 'B06'.
+    IT_DOWNFILE_HAC = IT_DOWNFILE.
+    APPEND IT_DOWNFILE_HAC. CLEAR IT_DOWNFILE_HAC.
+  ENDIF.
+  CLEAR IT_DOWNFILE.
+
+  W_N_9 = W_N_9 + 1.
+ENDFORM.                    " R5
+*&---------------------------------------------------------------------*
+*&      Form  MAKE_VM
+*&---------------------------------------------------------------------*
+FORM MAKE_VM.
+  DATA : SO LIKE BAPI_SELECTED_OBJECTS OCCURS 0 WITH HEADER LINE,
+         SC LIKE BAPI_SELECTION_CRITERIONS OCCURS 0 WITH HEADER LINE.
+
+  DATA : W_WORKORDER(14).
+
+  REFRESH : SC, SO. CLEAR : SC, SO.
+
+  CONCATENATE IT_WOSUM-WO_SER IT_WOSUM-NATION IT_WOSUM-DEALER
+              INTO W_WORKORDER.
+
+  SC-NAME_CHAR  = 'P_WORK_ORDER'.
+  SC-CHAR_VALUE = W_WORKORDER.
+  APPEND SC.
+
+  SC-NAME_CHAR  = 'P_EXT_COLOR'.
+  SC-CHAR_VALUE = IT_WOSUM-EXTC.
+  APPEND SC.
+
+  SC-NAME_CHAR  = 'P_INT_COLOR'.
+  SC-CHAR_VALUE = IT_WOSUM-INTC.
+  APPEND SC.
+
+  SC-NAME_CHAR  = 'P_SALES_ORDER'.
+  SC-CHAR_VALUE = IT_WOSUM-SALES.
+  APPEND SC.
+
+**  SC-NAME_CHAR  = 'P_FSC'.
+**  SC-CHAR_VALUE = IT_WOSUM-FSC.
+**  APPEND SC.
+
+  CALL FUNCTION 'BAPI_CLASS_SELECT_OBJECTS'
+    EXPORTING
+      CLASSTYPE                  = '002'
+      CLASSNUM                   = 'P_VEHICLE_MASTER'
+*     LANGUISO                   =
+*     LANGUINT                   =
+      KEYDATE                    = SY-DATUM
+*     MAXHITS                    = 100
+*     I_STATUS_LOCKED            = ' '
+*     I_STATUS_INCOMPLETE        = ' '
+*   IMPORTING
+*     RETURN                     =
+    TABLES
+      SELECTIONCRITERIONS        = SC
+      SELECTEDOBJECTS            = SO
+*     OBJECTCLASSIFICATION       =
+              .
+
+  REFRESH : IT_AUSP.
+  CLEAR   : IT_AUSP.
+  LOOP AT SO.
+    SELECT *
+           FROM AUSP
+          WHERE ATINN IN S_ATINN
+          AND   OBJEK EQ SO-OBJECT.
+      IT_AUSP-OBJEK = AUSP-OBJEK.
+      IT_AUSP-ATINN = AUSP-ATINN.
+      IT_AUSP-ATWRT = AUSP-ATWRT.
+      IT_AUSP-ATFLV = AUSP-ATFLV.
+      READ TABLE IT_CABN WITH KEY ATINN = IT_AUSP-ATINN.
+      IT_AUSP-ATNAM = IT_CABN-ATNAM.
+      APPEND IT_AUSP. CLEAR IT_AUSP.
+    ENDSELECT.
+  ENDLOOP.
+ENDFORM.                    " MAKE_VM
+*&---------------------------------------------------------------------*
+*&      Form  DOWNLOAD_FILE
+*&---------------------------------------------------------------------*
+FORM DOWNLOAD_FILE.
+  DESCRIBE TABLE IT_DOWNFILE LINES W_N_9.
+  IF W_N_9 <> 0.
+    W_CNT = W_N_9.
+    PERFORM DOWNLOAD_GLOVIS USING W_N_9.
+  ENDIF.
+
+  DESCRIBE TABLE IT_DOWNFILE_HMA LINES W_N_9.
+  IF W_N_9 <> 0.
+    W_CNT = W_N_9.
+    PERFORM DOWNLOAD_HMA USING W_N_9.
+  ENDIF.
+
+  DESCRIBE TABLE IT_DOWNFILE_HAC LINES W_N_9.
+  IF W_N_9 <> 0.
+    W_CNT = W_N_9.
+    PERFORM DOWNLOAD_HAC USING W_N_9.
+  ENDIF.
+ENDFORM.                    " DOWNLOAD_FILE
+*&---------------------------------------------------------------------*
+*&      Form  DOWNLOAD_GLOVIS
+*&---------------------------------------------------------------------*
+FORM DOWNLOAD_GLOVIS USING W_N_9.
+**  CONCATENATE  '/sapmnt/' SY-SYSID '/EDI/'
+**               'GS_' SY-DATUM+2(6)
+**               'S.txt'
+**               INTO W_DSN.
+  CONCATENATE  '/usr/sap/EDI_SAP/'
+               'GS_' SY-DATUM+2(6)
+               'S.txt'
+               INTO W_DSN.
+
+  PERFORM MAKE_R1.
+  LOOP AT IT_DOWNFILE.
+    PERFORM SAPGUI_PROGRESS_INDICATOR USING 2.
+
+    OPEN DATASET W_DSN IN TEXT MODE FOR APPENDING.
+    TRANSFER IT_DOWNFILE TO W_DSN.
+  ENDLOOP.
+  PERFORM MAKE_R6 USING W_N_9.
+
+  CLOSE DATASET W_DSN.
+
+  IF SY-SUBRC = 0.
+    MESSAGE I000 WITH TEXT-M02 '(GLOVIS)'.
+  ELSE.
+    MESSAGE I000 WITH TEXT-M03 '(GLOVIS)'.
+  ENDIF.
+ENDFORM.                    " DOWNLOAD_GLOVIS
+*&---------------------------------------------------------------------*
+*&      Form  DOWNLOAD_HMA
+*&---------------------------------------------------------------------*
+FORM DOWNLOAD_HMA USING W_N_9.
+**  CONCATENATE  '/sapmnt/' SY-SYSID '/EDI/'
+**               'HM_' SY-DATUM+2(6)
+**               'S.txt'
+**               INTO W_DSN.
+  CONCATENATE  '/usr/sap/EDI_SAP/'
+               'HM_' SY-DATUM+2(6)
+               'S.txt'
+               INTO W_DSN.
+
+  PERFORM MAKE_R1.
+  LOOP AT IT_DOWNFILE_HMA.
+    PERFORM SAPGUI_PROGRESS_INDICATOR USING 3.
+
+    OPEN DATASET W_DSN IN TEXT MODE FOR APPENDING.
+    TRANSFER IT_DOWNFILE_HMA TO W_DSN.
+  ENDLOOP.
+  PERFORM MAKE_R6 USING W_N_9.
+
+  CLOSE DATASET W_DSN.
+
+  IF SY-SUBRC = 0.
+    MESSAGE I000 WITH TEXT-M02 '(HMA)'.
+  ELSE.
+    MESSAGE I000 WITH TEXT-M03 '(HMA)'.
+  ENDIF.
+ENDFORM.                    " DOWNLOAD_HMA
+*&---------------------------------------------------------------------*
+*&      Form  DOWNLOAD_HAC
+*&---------------------------------------------------------------------*
+FORM DOWNLOAD_HAC USING W_N_9.
+**  CONCATENATE  '/sapmnt/' SY-SYSID '/EDI/'
+**               'HAC' SY-DATUM+2(6)
+**               'S.txt'
+**               INTO W_DSN.
+  CONCATENATE  '/usr/sap/EDI_SAP/'
+               'HAC' SY-DATUM+2(6)
+               'S.txt'
+               INTO W_DSN.
+
+  PERFORM MAKE_R1.
+  LOOP AT IT_DOWNFILE_HAC.
+    PERFORM SAPGUI_PROGRESS_INDICATOR USING 4.
+
+    OPEN DATASET W_DSN IN TEXT MODE FOR APPENDING.
+    TRANSFER IT_DOWNFILE_HAC TO W_DSN.
+  ENDLOOP.
+  PERFORM MAKE_R6 USING W_N_9.
+
+  CLOSE DATASET W_DSN.
+
+  IF SY-SUBRC = 0.
+    MESSAGE I000 WITH TEXT-M02 '(HAC)'.
+  ELSE.
+    MESSAGE I000 WITH TEXT-M03 '(HAC)'.
+  ENDIF.
+ENDFORM.                    " DOWNLOAD_HAC
+*&---------------------------------------------------------------------*
+*&      Form  MAKE_R1
+*&---------------------------------------------------------------------*
+FORM MAKE_R1.
+  CLEAR IT_DOWNFILE.
+  IT_DOWNFILE-RECORD+0(3)    = 'O1H'.
+  IT_DOWNFILE-RECORD+3(8)    = SY-DATUM.
+
+  OPEN DATASET W_DSN IN TEXT MODE FOR OUTPUT. "CHECK DUPL.
+  TRANSFER IT_DOWNFILE TO W_DSN.
+ENDFORM.                    " MAKE_R1
+*&---------------------------------------------------------------------*
+*&      Form  MAKE_R6
+*&---------------------------------------------------------------------*
+FORM MAKE_R6 USING W_N_9.
+  CLEAR IT_DOWNFILE.
+  IT_DOWNFILE-RECORD+0(3)    = 'O1T'.
+  IT_DOWNFILE-RECORD+3(9)    = W_N_9.
+
+  OPEN DATASET W_DSN IN TEXT MODE FOR APPENDING.
+  TRANSFER IT_DOWNFILE TO W_DSN.
+ENDFORM.                    " MAKE_R6
+*&---------------------------------------------------------------------*
+*&      Form  SAPGUI_PROGRESS_INDICATOR
+*&---------------------------------------------------------------------*
+FORM SAPGUI_PROGRESS_INDICATOR USING GUBUN.
+DATA : W_PERC TYPE P DECIMALS 2,
+       W_TEXT(50).
+
+  W_PERC = SY-TABIX / W_CNT * 100.
+  WRITE W_PERC TO W_TEXT+0(7).
+  CASE GUBUN.
+  WHEN '1'.
+    CONCATENATE W_TEXT 'Make the file with WorkOrder'
+                INTO W_TEXT SEPARATED BY SPACE.
+  WHEN '2'.
+    CONCATENATE W_TEXT 'Downloading file for GLOVIS'
+                INTO W_TEXT SEPARATED BY SPACE.
+  WHEN '3'.
+    CONCATENATE W_TEXT 'Downloading file for HMA'
+                INTO W_TEXT SEPARATED BY SPACE.
+  WHEN '4'.
+    CONCATENATE W_TEXT 'Downloading file for HAC'
+                INTO W_TEXT SEPARATED BY SPACE.
+  ENDCASE.
+
+  CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+    EXPORTING
+      PERCENTAGE       = W_PERC
+      TEXT             = W_TEXT.
+ENDFORM.                    " SAPGUI_PROGRESS_INDICATOR

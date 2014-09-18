@@ -1,0 +1,191 @@
+FUNCTION ZMMF_VAZ_IF_PO.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(I_ZSMM_IF002) LIKE  ZSMM_IF002 STRUCTURE  ZSMM_IF002
+*"       OPTIONAL
+*"     VALUE(I_CHECK) TYPE  CHAR1 OPTIONAL
+*"     VALUE(I_TEST) TYPE  CHAR1 OPTIONAL
+*"  EXPORTING
+*"     VALUE(E_IFRESULT) TYPE  ZRESULT
+*"     VALUE(E_IFFAILMSG) TYPE  BAPIRETURN-MESSAGE
+*"  TABLES
+*"      T_ITEM STRUCTURE  ZSMM_IF009 OPTIONAL
+*"      T_CONDITION STRUCTURE  ZSMM_IF010 OPTIONAL
+*"      T_SERVICE STRUCTURE  ZSMM_IF011 OPTIONAL
+*"      E_RETURN STRUCTURE  BAPIRETURN OPTIONAL
+*"      PT_VAZ_IF009 STRUCTURE  ZSMM_VAZ_IF009
+*"----------------------------------------------------------------------
+*-- i_check C: --> Create
+*           R: --> Modify
+*           D: --> Delete
+  DATA: L_PO LIKE ZSMM_IF002,
+        L_POITEM    LIKE ZSMM_IF009 OCCURS 0 WITH HEADER LINE,
+        L_CONDITION LIKE ZSMM_IF010 OCCURS 0 WITH HEADER LINE,
+        L_SERVICE   LIKE ZSMM_IF011 OCCURS 0 WITH HEADER LINE,
+        L_DEBUG TYPE C VALUE 'N'.
+  DATA:  L_CH_USER_ID LIKE PT_VAZ_IF009-CH_USER_ID.
+
+  CLEAR L_PO.
+  CLEAR: L_POITEM, L_POITEM[].
+  CLEAR: L_CONDITION, L_CONDITION[].
+  CLEAR: L_SERVICE, L_SERVICE[].
+*--Modification : 11/05/2006
+*-Convert net price to control decimal length.
+  DATA : L_LENGTH  LIKE DFIES-DECIMALS,
+         L_CUR_LEN TYPE I,
+         L_SQUARE  TYPE I,
+         L_DECIMAL TYPE P DECIMALS 5,
+         L_CURRDEC LIKE TCURX-CURRKEY.
+
+  DATA : IT_TCURX TYPE TABLE OF TCURX WITH HEADER LINE.
+  DATA L_TABIX LIKE SY-TABIX.
+
+  IF NOT I_TEST IS INITIAL.
+    SELECT * INTO TABLE PT_VAZ_IF009 UP TO 1 ROWS
+      FROM ZTMM_VAZ_PO_LOG.
+  ELSE.
+** added by Furong on 106/19/2006
+    DELETE ZTMM_VAZ_PO_LOG FROM TABLE PT_VAZ_IF009.
+    INSERT ZTMM_VAZ_PO_LOG FROM TABLE PT_VAZ_IF009
+           ACCEPTING DUPLICATE KEYS.
+    COMMIT WORK.
+  ENDIF.
+
+  REFRESH: T_ITEM.
+  CLEAR: T_ITEM, I_ZSMM_IF002.
+  LOOP AT PT_VAZ_IF009.
+    IF SY-TABIX  = 1.
+      MOVE-CORRESPONDING PT_VAZ_IF009 TO I_ZSMM_IF002.
+      I_ZSMM_IF002-TYPE = PT_VAZ_IF009-ZFLAG.
+      I_ZSMM_IF002-CUKY = PT_VAZ_IF009-WAERS.
+      I_CHECK = PT_VAZ_IF009-ZFLAG.
+      L_CH_USER_ID = PT_VAZ_IF009-CH_USER_ID.
+** ?? for testing only
+*      IF  I_ZSMM_IF002-EKGRP IS INITIAL.
+*        I_ZSMM_IF002-EKGRP = 'B22'.
+*      ENDIF.
+*      IF  I_ZSMM_IF002-VERKF IS INITIAL.
+*        I_ZSMM_IF002-VERKF = 'Sales'.
+*      ENDIF.
+** ??
+    ENDIF.
+    MOVE-CORRESPONDING PT_VAZ_IF009 TO T_ITEM.
+    APPEND T_ITEM.
+    CLEAR: T_ITEM.
+  ENDLOOP.
+  IF I_ZSMM_IF002-EKGRP IS INITIAL.
+    SELECT SINGLE EKGRP INTO I_ZSMM_IF002-EKGRP
+      FROM ZTMM_VAZ_EKGRP
+      WHERE CH_USER_ID = L_CH_USER_ID.
+    IF SY-SUBRC = 0.
+    ELSE.
+      I_ZSMM_IF002-EKGRP = 'B22'.
+    ENDIF.
+  ENDIF.
+  I_ZSMM_IF002-BUKRS = 'H201'.
+  I_ZSMM_IF002-EKORG = 'PU01'.
+
+*--ABAP Memory : called by re-proceesing program
+*  DATA : L_FLAG.
+*  IMPORT L_FLAG FROM MEMORY ID 'FLAG'.
+*  IF L_FLAG NE 'X'.
+*
+*    LOOP AT T_ITEM.
+*      L_TABIX = SY-TABIX.
+*      CALL FUNCTION 'SWA_DETERMINE_DECIMALS'
+*           EXPORTING
+*                EXPRESSION = T_ITEM-ZNETPR
+*           IMPORTING
+*                DECIMALS   = L_LENGTH.
+*
+*      CLEAR IT_TCURX. REFRESH IT_TCURX.
+*      SELECT * INTO TABLE IT_TCURX
+*                            FROM TCURX.
+*
+*      READ TABLE IT_TCURX WITH KEY CURRKEY = I_ZSMM_IF002-CUKY.
+*      IF SY-SUBRC = 0.
+*        IF IT_TCURX-CURRDEC = 0.
+*          L_CUR_LEN = 2.
+*        ELSE.
+*          L_CUR_LEN = L_CURRDEC.
+*        ENDIF.
+*      ELSEIF SY-SUBRC NE 0.
+*        L_CUR_LEN = 2.
+*      ENDIF.
+*
+*      L_SQUARE  = L_LENGTH - L_CUR_LEN.
+*      G_PER     = L_SQUARE.
+*
+*      IF L_SQUARE > 0.
+*        L_SQUARE  = 10 ** L_SQUARE.
+*        L_DECIMAL = T_ITEM-ZNETPR * L_SQUARE.
+*
+*      ELSE.
+*        L_DECIMAL = T_ITEM-ZNETPR.
+*      ENDIF.
+*
+*      CALL FUNCTION 'ROUND'
+*           EXPORTING
+*                DECIMALS = 2
+*                INPUT    = L_DECIMAL
+*                SIGN     = '+'
+*           IMPORTING
+*                OUTPUT   = L_DECIMAL.
+*
+*      T_ITEM-NETPR = L_DECIMAL.
+*** Changed by Furong on 06/02/2006
+*      IF G_PER < 0.
+*        G_PER = 0.
+*      ENDIF.
+*      T_ITEM-PEINH = 10 ** G_PER.
+*** end of change
+*      MODIFY T_ITEM INDEX L_TABIX.
+*    ENDLOOP.
+*  ENDIF.
+*--End Modification : 11/05/2006
+*-----------------------------------------
+  MOVE: I_ZSMM_IF002 TO L_PO.
+
+  MOVE: T_ITEM[]      TO L_POITEM[].
+  MOVE: T_CONDITION[] TO L_CONDITION[].
+  MOVE: T_SERVICE[]   TO L_SERVICE[].
+
+  IF I_CHECK EQ 'C'.
+    CALL FUNCTION 'ZMMF_IF_PO_CREATE'
+         EXPORTING
+              I_ZSMM_IF002 = L_PO
+         TABLES
+              T_ITEM       = L_POITEM
+              T_CONDITION  = L_CONDITION
+              T_SERVICE    = L_SERVICE
+              E_RETURN     = E_RETURN.
+  ELSEIF I_CHECK EQ 'R' OR I_CHECK EQ 'D'.
+    CALL FUNCTION 'ZMMF_IF_PO_CHANGE'
+         EXPORTING
+              I_ZSMM_IF002 = L_PO
+              I_CHECK      = I_CHECK
+         TABLES
+              T_ITEM       = L_POITEM
+              T_CONDITION  = L_CONDITION
+              T_SERVICE    = L_SERVICE
+              E_RETURN     = E_RETURN.
+  ENDIF.
+
+  READ TABLE E_RETURN WITH KEY TYPE = 'E'.
+  IF SY-SUBRC = 0.
+    E_IFRESULT = 'E'.
+    E_IFFAILMSG =  E_RETURN-MESSAGE.
+**   PERFORM SEND_EMAIL.                                ?????
+  ELSE.
+    READ TABLE E_RETURN WITH KEY TYPE = 'S'.
+    IF SY-SUBRC = 0.
+      E_IFRESULT = 'S'.
+      E_IFFAILMSG = 'Success'.
+    ELSE.
+      E_IFRESULT = 'E'.
+      CONCATENATE L_PO-EBELN  L_PO-BSTYP
+          L_PO-BSART INTO E_IFFAILMSG.
+    ENDIF.
+  ENDIF.
+ENDFUNCTION.

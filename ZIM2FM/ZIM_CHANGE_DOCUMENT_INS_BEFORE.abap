@@ -1,0 +1,43 @@
+FUNCTION ZIM_CHANGE_DOCUMENT_INS_BEFORE.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     REFERENCE(W_ZFREQNO) LIKE  ZTINS-ZFREQNO
+*"     REFERENCE(W_ZFINSEQ) LIKE  ZTINS-ZFINSEQ
+*"     REFERENCE(W_ZFAMDNO) LIKE  ZTINS-ZFAMDNO
+*"     REFERENCE(W_ZFDOCST) LIKE  ZTINS-ZFDOCST OPTIONAL
+*"     REFERENCE(W_ZFEDIST) LIKE  ZTINS-ZFEDIST OPTIONAL
+*"----------------------------------------------------------------------
+   CLEAR : *ZTINSRSP, *ZTINSSG3.
+
+   SELECT SINGLE * INTO O_ZTINS   FROM ZTINS
+                   WHERE ZFREQNO EQ W_ZFREQNO
+                   AND   ZFINSEQ EQ W_ZFINSEQ
+                   AND   ZFAMDNO EQ W_ZFAMDNO.
+
+   N_ZTINS   = O_ZTINS.
+   IF NOT W_ZFDOCST IS INITIAL.
+      MOVE : W_ZFDOCST   TO    N_ZTINS-ZFDOCST.
+   ENDIF.
+   IF NOT W_ZFEDIST IS INITIAL.
+      MOVE : W_ZFEDIST   TO    N_ZTINS-ZFEDIST.
+   ENDIF.
+
+   MOVE:  SY-DATUM    TO    N_ZTINS-UDAT,
+          SY-UNAME    TO    N_ZTINS-UNAM.
+
+   MOVE-CORRESPONDING  N_ZTINS   TO   ZTINS.
+   UPDATE ZTINS.
+
+* CHANGE DOCUMENT
+  CALL FUNCTION 'ZIM_CHANGE_DOCUMENT_INS'
+     EXPORTING
+        UPD_CHNGIND    =     'U'
+        N_ZTINS        =     N_ZTINS
+        O_ZTINS        =     O_ZTINS
+        N_ZTINSRSP     =     *ZTINSRSP
+        O_ZTINSRSP     =     *ZTINSRSP
+        N_ZTINSSG3     =     *ZTINSSG3
+        O_ZTINSSG3     =     *ZTINSSG3.
+
+ENDFUNCTION.

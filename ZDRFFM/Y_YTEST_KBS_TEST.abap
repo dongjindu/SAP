@@ -1,0 +1,35 @@
+FUNCTION Y_YTEST_KBS_TEST.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  TABLES
+*"      T_OSORDER STRUCTURE  ZSRF_TRANSFER_SL_TO_SL
+*"----------------------------------------------------------------------
+
+TABLES :YTEST_KBS_TEST.
+DATA: LT_DIST TYPE YTEST_KBS_TEST OCCURS 0 WITH HEADER LINE.
+DATA L_ZDOCNO TYPE YTEST_KBS_TEST-ZDOCNO.
+
+
+   SELECT  MAX( ZDOCNO )
+        FROM YTEST_KBS_TEST
+        INTO L_ZDOCNO.
+*        GROUP BY ZDOCNO.
+   IF SY-SUBRC EQ 0.
+
+   ELSE.
+     L_ZDOCNO = '0'.
+   ENDIF.
+     LOOP AT T_OSORDER.
+       L_ZDOCNO = L_ZDOCNO + 1.
+       MOVE-CORRESPONDING T_OSORDER TO LT_DIST.
+       LT_DIST-ZDOCNO = L_ZDOCNO.
+       APPEND LT_DIST.
+       CLEAR LT_DIST.
+     ENDLOOP.
+  INSERT YTEST_KBS_TEST FROM TABLE LT_DIST.
+  IF SY-SUBRC EQ 0.
+    COMMIT WORK.
+  ELSE.
+    ROLLBACK WORK.
+  ENDIF.
+ENDFUNCTION.

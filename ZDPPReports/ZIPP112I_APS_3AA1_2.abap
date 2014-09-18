@@ -1,0 +1,236 @@
+REPORT  ZIPP112I_APS_3AA1_2 NO STANDARD PAGE HEADING
+                          MESSAGE-ID ZMPP.
+************************************************************************
+* Program Name      : ZIPP112I_APS_3AA1_2
+* Author            :
+* Creation Date     : 09/30/08
+* Specifications By :
+* Addl Documentation: APS II - Change in Order
+* Description       :
+*
+************************************************************************
+* Modification Logs
+* Date        Developer    RequestNo    Description
+*
+************************************************************************
+*TABLES:ZTPP_ZTPP_PSS03AA.
+
+DATA: IT_PSS03AA LIKE TABLE OF ZTPP_PSS03AA WITH HEADER LINE.
+
+DATA: W_RESULT(1).
+
+CONSTANTS: C_DEST(10) VALUE 'WMPP01'.   "Outbound Interface Destination
+
+************************************************************************
+*              SELECTION SCREEN LAYOUT                                 *
+************************************************************************
+SELECTION-SCREEN: BEGIN OF BLOCK B1 WITH FRAME.
+PARAMETERS: P_DATE LIKE SY-DATUM.
+SELECTION-SCREEN SKIP.
+PARAMETERS: P_CHANGE RADIOBUTTON GROUP GRP,
+            P_SCRP RADIOBUTTON  GROUP GRP.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS: P_EAI          TYPE C AS CHECKBOX  DEFAULT 'X'.
+SELECTION-SCREEN COMMENT  (55) TEXT-100 FOR FIELD P_EAI.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN: END OF BLOCK B1.
+
+INITIALIZATION.
+
+START-OF-SELECTION.
+  IF P_CHANGE = 'X'.
+    PERFORM DATA_SELECT_SPEC.
+  ELSE.
+    PERFORM DATA_SELECT_SCRP.
+  ENDIF.
+  IF IT_PSS03AA[] IS INITIAL.
+    MESSAGE I001 WITH TEXT-001.
+  ELSE.
+    IF P_EAI = 'X'.
+      PERFORM SEND_DATA.
+    ENDIF.
+    PERFORM DATA_UPDATE.
+  ENDIF.
+
+END-OF-SELECTION.
+
+*&---------------------------------------------------------------------*
+*&      Form  DATA_SELECT
+*&---------------------------------------------------------------------*
+FORM DATA_SELECT_SPEC.
+
+  DATA: L_PSS03AA LIKE ZTPP_PSS03AA,
+        LT_CHANGE LIKE TABLE OF ZTPP_CHANGE WITH HEADER LINE.
+  DATA: L_FSC LIKE ZTPP_WOSUM-FSC,
+        L_DATE_C(8),
+        L_TIME_C(6).
+
+  SELECT * INTO TABLE LT_CHANGE
+   FROM ZTPP_CHANGE
+   WHERE ERDAT = P_DATE
+     AND CFLAG = 'S'.
+
+  LOOP AT LT_CHANGE.
+    CLEAR: L_PSS03AA.
+    L_PSS03AA-ERDAT = SY-DATUM.
+    L_PSS03AA-ERZET = SY-UZEIT.
+    L_PSS03AA-PLNT = '1'.
+    L_DATE_C = L_PSS03AA-ERDAT.
+    L_TIME_C = L_PSS03AA-ERZET.
+    CONCATENATE L_DATE_C L_TIME_C INTO L_PSS03AA-DATE_TIME.
+
+** B Order
+    L_PSS03AA-ORDNO = LT_CHANGE-B_ORDNO.
+    CONCATENATE LT_CHANGE-B_NATION LT_CHANGE-B_DEALER
+                INTO L_PSS03AA-NATION.
+    L_PSS03AA-EXTC = LT_CHANGE-B_EXTC.
+    L_PSS03AA-INTC = LT_CHANGE-B_INTC.
+    L_PSS03AA-BMDL = LT_CHANGE-B_MI.
+    L_PSS03AA-OCN = LT_CHANGE-B_OCN.
+    L_PSS03AA-VERSION  = LT_CHANGE-B_VERS.
+    L_PSS03AA-DEST = L_PSS03AA-NATION.
+  SELECT SINGLE FSC MODQTY SEQQTY MITUQTY INTO (L_FSC, L_PSS03AA-ORDQTY,
+             L_PSS03AA-SEQQTY, L_PSS03AA-MITUQTY)
+             FROM ZTPP_WOSUM
+            WHERE WO_SER = LT_CHANGE-B_ORDNO
+              AND NATION = LT_CHANGE-B_NATION
+              AND DEALER = LT_CHANGE-B_DEALER
+              AND EXTC = LT_CHANGE-B_EXTC
+              AND INTC = LT_CHANGE-B_INTC.
+    L_PSS03AA-MODL = L_FSC+5(2).
+
+    APPEND L_PSS03AA TO IT_PSS03AA.
+
+    CLEAR: L_FSC, L_PSS03AA-ORDNO, L_PSS03AA-NATION,L_PSS03AA-EXTC,
+      L_PSS03AA-INTC,L_PSS03AA-BMDL,L_PSS03AA-OCN,L_PSS03AA-VERSION,
+      L_PSS03AA-DEST,L_PSS03AA-ORDQTY,
+      L_PSS03AA-SEQQTY,L_PSS03AA-MITUQTY,L_PSS03AA-MODL.
+
+** Changed Order
+    L_PSS03AA-ORDNO = LT_CHANGE-ORDNO.
+    CONCATENATE LT_CHANGE-NATION LT_CHANGE-DEALER
+                INTO L_PSS03AA-NATION.
+    L_PSS03AA-EXTC = LT_CHANGE-EXTC.
+    L_PSS03AA-INTC = LT_CHANGE-INTC.
+    L_PSS03AA-BMDL = LT_CHANGE-MI.
+    L_PSS03AA-OCN = LT_CHANGE-OCN.
+    L_PSS03AA-VERSION  = LT_CHANGE-VERS.
+    L_PSS03AA-DEST = L_PSS03AA-NATION.
+    SELECT SINGLE FSC MODQTY SEQQTY MITUQTY INTO
+       (L_FSC, L_PSS03AA-ORDQTY, L_PSS03AA-SEQQTY, L_PSS03AA-MITUQTY)
+       FROM ZTPP_WOSUM
+      WHERE WO_SER = LT_CHANGE-ORDNO
+        AND NATION = LT_CHANGE-NATION
+        AND DEALER = LT_CHANGE-DEALER
+        AND EXTC = LT_CHANGE-EXTC
+        AND INTC = LT_CHANGE-INTC.
+    L_PSS03AA-MODL = L_FSC+5(2).
+    APPEND L_PSS03AA TO IT_PSS03AA.
+  ENDLOOP.
+  SORT IT_PSS03AA BY ORDNO NATION EXTC INTC MODL BMDL OCN VERSION.
+  DELETE ADJACENT DUPLICATES FROM IT_PSS03AA COMPARING
+         ORDNO NATION EXTC INTC MODL BMDL OCN VERSION.
+
+ENDFORM.                    " DATA_SELECT
+
+*&---------------------------------------------------------------------*
+*&      Form  DATA_UPDATE
+*&---------------------------------------------------------------------*
+FORM DATA_UPDATE.
+
+  INSERT ZTPP_PSS03AA FROM TABLE IT_PSS03AA.
+  IF SY-SUBRC = 0.
+    COMMIT WORK.
+    MESSAGE  S001 WITH TEXT-002.
+  ELSE.
+    ROLLBACK WORK.
+    MESSAGE  W001 WITH TEXT-003.
+  ENDIF.
+
+ENDFORM.                    " DATA_UPDATE
+*&---------------------------------------------------------------------*
+*&      Form  SEND_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SEND_DATA.
+  DATA : L_MSGTXT(100).
+
+  CALL FUNCTION 'Z_FPP_SET_PSS03AA_2'
+    DESTINATION C_DEST
+    IMPORTING
+      FLAG          = W_RESULT
+    TABLES
+      I_PSS03AA     = IT_PSS03AA
+    EXCEPTIONS
+      COMMUNICATION_FAILURE = 1 MESSAGE L_MSGTXT
+      SYSTEM_FAILURE        = 2 MESSAGE L_MSGTXT.
+
+  IF W_RESULT = 'S'.
+    MESSAGE I001 WITH 'Successfully sent out'.
+  ELSE.
+    IF W_RESULT IS INITIAL.
+      W_RESULT = 'E'.
+    ENDIF.
+    MESSAGE I001 WITH L_MSGTXT.
+  ENDIF.
+  LOOP AT IT_PSS03AA.
+    IT_PSS03AA-INT_FLAG = W_RESULT.
+    IT_PSS03AA-INTDATE = SY-DATUM.
+    MODIFY IT_PSS03AA TRANSPORTING INT_FLAG.
+  ENDLOOP.
+ENDFORM.                    " SEND_DATA
+*&---------------------------------------------------------------------*
+*&      Form  DATA_SELECT_sCRP
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM DATA_SELECT_SCRP.
+  DATA: L_PSS03AA LIKE ZTPP_PSS03AA,
+        LT_SCRAP_CAR LIKE TABLE OF ZTPP_SCRAP_CAR WITH HEADER LINE.
+  DATA: L_FSC LIKE ZTPP_WOSUM-FSC,
+        L_DATE_C(8),
+        L_TIME_C(6).
+
+  SELECT * INTO TABLE LT_SCRAP_CAR
+   FROM ZTPP_SCRAP_CAR
+   WHERE SCR_DATE = P_DATE.
+
+  LOOP AT LT_SCRAP_CAR.
+    CLEAR: L_PSS03AA.
+    L_PSS03AA-ERDAT = SY-DATUM.
+    L_PSS03AA-ERZET = SY-UZEIT.
+    L_PSS03AA-PLNT = '1'.
+    L_DATE_C = L_PSS03AA-ERDAT.
+    L_TIME_C = L_PSS03AA-ERZET.
+    CONCATENATE L_DATE_C L_TIME_C INTO L_PSS03AA-DATE_TIME.
+
+    L_PSS03AA-ORDNO = LT_SCRAP_CAR-WORDER+0(9).
+    L_PSS03AA-NATION = LT_SCRAP_CAR-WORDER+9(5).
+    L_PSS03AA-EXTC = LT_SCRAP_CAR-EXTC.
+    L_PSS03AA-INTC = LT_SCRAP_CAR-INTC.
+    L_PSS03AA-BMDL = LT_SCRAP_CAR-MI.
+    L_PSS03AA-OCN = LT_SCRAP_CAR-OCNN.
+    L_PSS03AA-VERSION  = LT_SCRAP_CAR-VERS.
+    L_PSS03AA-DEST = L_PSS03AA-NATION.
+    SELECT SINGLE FSC MODQTY SEQQTY MITUQTY INTO
+       (L_FSC, L_PSS03AA-ORDQTY, L_PSS03AA-SEQQTY, L_PSS03AA-MITUQTY)
+       FROM ZTPP_WOSUM
+      WHERE WO_SER = L_PSS03AA-ORDNO
+        AND NATION = L_PSS03AA-NATION+0(3)
+        AND DEALER = L_PSS03AA-NATION+3(2)
+        AND EXTC = L_PSS03AA-EXTC
+        AND INTC = L_PSS03AA-INTC.
+    L_PSS03AA-MODL = L_FSC+5(2).
+    APPEND L_PSS03AA TO IT_PSS03AA.
+  ENDLOOP.
+  SORT IT_PSS03AA BY ORDNO NATION EXTC INTC MODL BMDL OCN VERSION.
+  DELETE ADJACENT DUPLICATES FROM IT_PSS03AA  COMPARING
+         ORDNO NATION EXTC INTC MODL BMDL OCN VERSION.
+ENDFORM.                    " DATA_SELECT_sCRP

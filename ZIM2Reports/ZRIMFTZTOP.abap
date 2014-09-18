@@ -1,0 +1,112 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZRIMFTZTOP                                                 *
+*----------------------------------------------------------------------*
+
+*>> Inbound Delivery Table
+TABLES :  LIKP,
+          LIPS,
+          EKPO,
+          MAKT,
+          MARA,
+          MARC,
+          T604T,
+          ZTBL,
+          A902,
+          KONP.
+
+*-----------------------------------------------------------------------
+* FTZ Interface Internal Table Define
+*-----------------------------------------------------------------------
+  DATA: BEGIN OF IT_SEL_DATA OCCURS 0,
+        BUDAT    LIKE   EKBE-BUDAT,
+        EBELN    LIKE   EKBE-EBELN,
+        EBELP    LIKE   EKBE-EBELP,
+        MATNR    LIKE   EKBE-MATNR,
+        MENGE    LIKE   EKBE-MENGE,
+        DMBTR    LIKE   EKBE-DMBTR,
+        WAERS    LIKE   EKBE-WAERS,
+        XBLNR    LIKE   EKBE-XBLNR.
+  DATA: END  OF IT_SEL_DATA.
+
+  DATA : BEGIN OF IT_ZTMM_6026_01 OCCURS 0.
+          INCLUDE STRUCTURE ZTMM_6026_01.
+  DATA : END   OF IT_ZTMM_6026_01.
+
+  DATA : BEGIN OF IT_ZSGRHS OCCURS 0.
+          INCLUDE STRUCTURE ZSGRHS.
+  DATA : END OF IT_ZSGRHS.
+
+  DATA : BEGIN OF IT_ZSGRMT OCCURS 0.
+          INCLUDE STRUCTURE ZSGRMT.
+  DATA : END OF IT_ZSGRMT.
+
+  DATA : BEGIN OF IT_ZSGRMT_TEMP OCCURS 0.
+          INCLUDE STRUCTURE ZSGRMT.
+  DATA : END OF IT_ZSGRMT_TEMP.
+
+  DATA : BEGIN OF IT_FTZ_LIPS OCCURS 0.
+          INCLUDE STRUCTURE LIPS.
+  DATA : END OF IT_FTZ_LIPS.
+
+  DATA: BEGIN OF IT_ZSFTZLOG  OCCURS 0.
+          INCLUDE STRUCTURE ZTFTZLOG.
+  DATA : END OF IT_ZSFTZLOG.
+
+  DATA: W_STATUS     TYPE C,
+        W_STATUS_SRC TYPE C,
+        W_ZFRPTTY    LIKE ZTBL-ZFRPTTY,
+        W_TABIX      LIKE SY-TABIX,
+        W_MATNR      LIKE EKPO-MATNR,
+        W_ZFBLNO     LIKE ZTBL-ZFBLNO,
+        W_TRANS_MODE TYPE C,
+        W_TRCL(15)   TYPE C,
+        W_BUDT(15)   TYPE C,
+        W_DOCNO      LIKE ZTREQHD-ZFREQNO,
+        W_DATE       LIKE SY-DATUM,
+        W_TIME       LIKE SY-UZEIT,
+        W_LINE       TYPE I,
+        W_STRLEN     TYPE I,
+        W_COLOR_LEN  TYPE I,
+        NEW_LFIMG    LIKE  PLFH-MGVGW,
+        L_RATE       LIKE ZTIMIMG08-ZFMRATE,
+        SV_MATNR     LIKE EKPO-MATNR,
+        SV_HBLNO     LIKE ZTBL-ZFHBLNO,
+        SV_EBELN     LIKE EKPO-EBELN,
+        SV_MENGE     LIKE EKPO-MENGE,
+        SV_TRTIME    LIKE ZSGRMT-TRTIME,
+        LV_ZRESULT   LIKE ZSCA_IF_TIME_STAMP_OUT-ZRESULT,
+        W_ZDOCNO     TYPE NUM10.       "App. Doc. No.
+
+  DATA : WA_ZTCA_IF_LOG   LIKE ZTCA_IF_LOG.
+  CONSTANTS: C_NRO_NR_09   VALUE '09' LIKE INRI-NRRANGENR.
+  DATA:  IT_FUNC TYPE STANDARD TABLE OF RSMPE-FUNC.
+  DATA:  WA_FUNC LIKE LINE OF IT_FUNC.
+  DATA:  W_TITLE(80).
+  DATA:  CC_NAME TYPE SCRFNAME VALUE 'CC_0100'.
+
+* For OK code
+  DATA: OK_CODE TYPE SY-UCOMM,  SAVE_OK_CODE LIKE OK_CODE.
+
+* For PF-STATUS and Titlebar
+  CLASS LCL_PS DEFINITION DEFERRED.
+  DATA: CRV_PS TYPE REF TO LCL_PS.
+  DATA: CRV_CUSTOM_CONTAINER TYPE REF TO CL_GUI_CUSTOM_CONTAINER,
+        CRV_ALV_GRID         TYPE REF TO CL_GUI_ALV_GRID.
+
+* Variables for ALV
+  DATA: WA_LAYOUT   TYPE LVC_S_LAYO.
+  DATA: IT_FIELDCAT TYPE LVC_T_FCAT WITH HEADER LINE.
+  DATA: WA_TOOLBAR  TYPE STB_BUTTON.
+  DATA: WA_SORT     TYPE LVC_S_SORT.
+  DATA: IT_SORT     LIKE TABLE OF WA_SORT.
+  DATA: IT_ROID TYPE LVC_T_ROID.
+  DATA: WA_ROID LIKE LINE OF IT_ROID.
+  DATA: IT_ROW TYPE LVC_T_ROW.
+  DATA: WA_ROW LIKE LINE OF IT_ROW.
+
+  DATA: BEGIN OF WA_ZTMM_6026_01.
+          INCLUDE STRUCTURE ZTMM_6026_01.
+  DATA:  "profl LIKE mara-profl,
+        END OF WA_ZTMM_6026_01.
+
+  DATA: IT_ZTMM_6026_01_OUT LIKE TABLE OF WA_ZTMM_6026_01.

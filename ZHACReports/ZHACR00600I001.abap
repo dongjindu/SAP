@@ -1,0 +1,41 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZHARC00600I001
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+MODULE USER_COMMAND_0100 INPUT.
+
+ENDMODULE.                 " USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  CANCEL  INPUT
+*&---------------------------------------------------------------------*
+MODULE CANCEL INPUT.
+  OK_CODE = OKCODE.
+
+  CASE SY-DYNNR.
+    WHEN '0100'.
+      CASE OK_CODE.
+        WHEN 'CANC'.
+          LEAVE TO SCREEN 0.
+      ENDCASE.
+  ENDCASE.
+
+ENDMODULE.                 " CANCEL  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  EXIT  INPUT
+*&---------------------------------------------------------------------*
+MODULE EXIT INPUT.
+
+  OK_CODE = OKCODE.
+
+  CASE SY-DYNNR.
+    WHEN '0100'.
+      CASE OK_CODE.
+        WHEN 'BACK' OR 'EXIT'.
+          LEAVE TO SCREEN 0.
+      ENDCASE.
+  ENDCASE.
+
+ENDMODULE.                 " EXIT  INPUT

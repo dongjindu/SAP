@@ -1,0 +1,70 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZRHR_DEV_PLAN_REPORTTOP
+*&---------------------------------------------------------------------*
+TYPE-POOLS: VRM.
+
+TABLES: PA0001, HRP1001.
+
+DATA: OK_CODE                 TYPE SY-UCOMM.
+
+* alv variable definition
+DATA: GR_CONT                 TYPE REF TO CL_GUI_CUSTOM_CONTAINER,
+      GR_GRID                 TYPE REF TO CL_GUI_ALV_GRID.
+DATA: GS_LAYO                 TYPE LVC_S_LAYO.
+DATA: GT_FCAT                 TYPE LVC_T_FCAT WITH HEADER LINE,
+      GT_SORT                 TYPE LVC_T_SORT WITH HEADER LINE.
+
+* dropdown definition
+DATA: GT_VALUES               TYPE VRM_VALUES,
+      GS_VALUE                LIKE LINE OF GT_VALUES,
+      G_FIELDNAME             TYPE VRM_ID.
+
+DATA: BEGIN OF GT_HRP1000 OCCURS 0,
+          PLVAR               TYPE HRP1000-PLVAR,
+          OTYPE               TYPE HRP1000-OTYPE,
+          OBJID               TYPE HRP1000-OBJID,
+          STEXT               TYPE HRP1000-STEXT,
+        END OF GT_HRP1000.
+
+DATA: BEGIN OF GS_RESULT.
+INCLUDE  TYPE ZSHR_COMP_RESULT.
+DATA:   DOTXT    TYPE HAP_VALUE_TXT,   "Development Opportunity
+        DONOTE   TYPE TDLINE,
+        TFTXT    TYPE HAP_VALUE_TXT,   "Time Frame
+        DPSTXTM  TYPE HAP_VALUE_TXT,   "Develpment Plan Status(MY)
+        DPSTNTM  TYPE TDLINE,
+        DPSTXTY  TYPE HAP_VALUE_TXT,   "Develpment Plan Status(YE)
+        DPSTNTY  TYPE TDLINE,
+        PERNR    TYPE PERSNO.
+DATA: END OF GS_RESULT.
+
+DATA: GT_RESULT               LIKE TABLE OF GS_RESULT.
+
+CONSTANTS: C_COLUMN_IID_ZP13  TYPE HAP_COLUMN_IID VALUE 7,    " Column Self Appraisal (YE)
+           C_COLUMN_IID_ZP14  TYPE HAP_COLUMN_IID VALUE 8.
+
+*&********************************************************************
+*    Selection Screen
+*&********************************************************************
+SELECTION-SCREEN BEGIN OF SCREEN 200 AS SUBSCREEN.
+SELECTION-SCREEN BEGIN OF BLOCK B1 WITH FRAME TITLE TEXT-T01.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 2(19) TEXT-T80 FOR FIELD P_YEAR.
+PARAMETERS: P_YEAR      TYPE ZDHR_YEAR AS LISTBOX VISIBLE LENGTH 10.
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 2(16) TEXT-T83 FOR FIELD S_KOSTL.
+SELECT-OPTIONS: S_KOSTL FOR PA0001-KOSTL NO INTERVALS
+                                         MATCHCODE OBJECT KOST.
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 2(16) TEXT-T85 FOR FIELD S_PERNR.
+SELECT-OPTIONS: S_PERNR FOR PA0001-PERNR NO INTERVALS
+                                         MATCHCODE OBJECT PREM.
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN END OF BLOCK B1.
+SELECTION-SCREEN END OF SCREEN 200 .

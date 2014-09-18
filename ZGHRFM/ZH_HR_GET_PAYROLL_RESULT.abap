@@ -1,0 +1,71 @@
+FUNCTION ZH_HR_GET_PAYROLL_RESULT.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_PERNR) TYPE  PERSNO
+*"     VALUE(IV_INPER) TYPE  IPERI
+*"     VALUE(IV_FPBEG) TYPE  FPBEG
+*"     VALUE(IV_FPEND) TYPE  FPEND
+*"  EXPORTING
+*"     REFERENCE(E_RESULT2) TYPE  ZGHRY0001
+*"     REFERENCE(E_RESULT3) TYPE  ZGHRY0001
+*"     REFERENCE(E_RESULT4) TYPE  ZGHRY0001
+*"     REFERENCE(E_RGDIR) TYPE  PC261
+*"----------------------------------------------------------------------
+
+  CLEAR :  E_RESULT2[], E_RESULT3[], E_RESULT4[], IT_LGART[],
+          RGDIR[], GT_RGDIR, GT_RGDIR[], GT_RT, GT_RT[], GT_RT2, GT_RT2[],
+          GT_PAY_RESULT, GT_PAY_RESULT[].
+
+  PERNR-PERNR = IV_PERNR.
+
+*& get payroll result
+  PERFORM READ_RGDIR USING IV_PERNR.
+  CHECK SY-SUBRC = 0.
+
+*& get first result of payroll structure results(ALL) : E_RESULT1
+*  IF E_RESULT1 IS REQUESTED.
+  PERFORM READ_PAYROLL_RESULT USING IV_PERNR IV_INPER.
+*    E_RESULT1[] = GT_PAY_RESULT[].
+*  ENDIF.
+
+*& purely retroactive(IN PERIOD received retroactive payroll) : E_RESULT3
+*& first result(FOR PERIOD = IN PERIOD)  : E_RESULT2
+*& get off the first result and retroactive : T_RT
+  IF E_RESULT2 IS REQUESTED OR E_RESULT3 IS REQUESTED OR E_RESULT4 IS REQUESTED .
+    PERFORM GET_RETRO TABLES E_RESULT3[] E_RESULT2[]
+                       USING IV_PERNR IV_INPER  IV_FPBEG IV_FPEND.
+  ENDIF.
+
+*  IF I_PAYTY = '    '.
+  LOOP AT GT_RGDIR WHERE FPPER = IV_INPER
+                     AND INPER = IV_INPER.
+*                     AND INOCR = I_OCRSN.
+    GS_RGDIR = GT_RGDIR.
+  ENDLOOP.
+*  ELSE.
+*    LOOP AT GT_RGDIR WHERE INPTY = I_PAYTY
+*                       AND INPID = I_PAYID
+*                       AND INOCR = I_OCRSN
+*                       AND PAYDT = I_BONDT.
+*      GS_RGDIR = GT_RGDIR.
+*    ENDLOOP.
+*  ENDIF.
+  E_RGDIR = GS_RGDIR.
+  IF E_RESULT4 IS REQUESTED.
+
+    CLEAR : WA_RESULT2, WA_RESULT3.
+    LOOP AT E_RESULT2 INTO WA_RESULT2.
+      MOVE-CORRESPONDING WA_RESULT2 TO GT_RT2.
+      COLLECT GT_RT2.
+    ENDLOOP.
+    LOOP AT E_RESULT3 INTO WA_RESULT3.
+      MOVE-CORRESPONDING WA_RESULT3 TO GT_RT2.
+      MOVE-CORRESPONDING GS_RGDIR TO GT_RT2.
+      COLLECT GT_RT2.
+    ENDLOOP.
+
+    E_RESULT4[] = GT_RT2[].
+  ENDIF.
+
+ENDFUNCTION.

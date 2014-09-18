@@ -1,0 +1,62 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZSAPBF_CPZP_CORRECTION_MASSSEL
+*&---------------------------------------------------------------------*
+SELECTION-SCREEN BEGIN OF BLOCK general WITH FRAME TITLE text-001.
+
+PARAMETERS: p_year TYPE gjahr OBLIGATORY DEFAULT sy-datlo(4),
+            p_month TYPE monat OBLIGATORY." DEFAULT sy-datlo+4(2).
+
+PARAMETERS: p_werks TYPE werks_d OBLIGATORY.
+SELECT-OPTIONS: so_aufnr FOR ckmlmv013-aufnr MATCHCODE OBJECT orde MODIF ID 10.
+SELECT-OPTIONS: so_pmatn FOR ckmlmv013-pmatn.
+SELECT-OPTIONS: so_verid FOR ckmlmv013-verid.
+
+SELECTION-SCREEN END OF BLOCK general.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK mode WITH FRAME TITLE text-002.
+
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS: p_test RADIOBUTTON GROUP mode TYPE zsapbf_cpzp_test DEFAULT 'X' USER-COMMAND u1.
+SELECTION-SCREEN COMMENT (10) text-p01 FOR FIELD p_test . "p_error.
+*SELECTION-SCREEN COMMENT 33(25) text-p02 FOR FIELD p_error.
+*SELECTION-SCREEN POSITION POS_HIGH.
+SELECTION-SCREEN COMMENT 20(22) text-p02 . "FOR FIELD p_error.
+PARAMETERS p_numpcc TYPE int1 DEFAULT 1.
+SELECTION-SCREEN END OF LINE.
+
+PARAMETERS: p_error AS CHECKBOX TYPE zsapbf_cpzp_error DEFAULT ' '.
+
+SELECTION-SCREEN BEGIN OF LINE .
+PARAMETERS: p_run RADIOBUTTON GROUP mode TYPE zsapbf_cpzp_run .
+SELECTION-SCREEN COMMENT  (15) text-p03 FOR FIELD p_run .
+SELECTION-SCREEN POSITION 20 .
+PARAMETERS: p_updcur TYPE flag AS CHECKBOX DEFAULT '' .
+SELECTION-SCREEN COMMENT  (25) text-p04 FOR FIELD p_updcur  .
+SELECTION-SCREEN END OF LINE.
+*PARAMETERS: p_run RADIOBUTTON GROUP mode TYPE zsapbf_cpzp_run .
+PARAMETERS: p_backup RADIOBUTTON GROUP mode TYPE zsapbf_cpzp_backup .
+SELECTION-SCREEN END OF BLOCK mode.
+
+SELECTION-SCREEN BEGIN OF BLOCK backup WITH FRAME TITLE text-004.
+PARAMETERS: p_sel RADIOBUTTON GROUP pcc TYPE zsapbf_cpzp_sel DEFAULT 'X' MODIF ID 30.
+PARAMETERS: p_all RADIOBUTTON GROUP pcc TYPE zsapbf_cpzp_all MODIF ID 30.
+
+PARAMETERS: p_full AS CHECKBOX TYPE zsapbf_cpzp_full DEFAULT ' ' MODIF ID 30.
+SELECTION-SCREEN END OF BLOCK backup.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE text-003.
+PARAMETERS: p_par  TYPE ppc_para AS CHECKBOX USER-COMMAND u2.
+PARAMETERS: p_sgr  TYPE wsl_ctrl-serv_grp  MODIF ID 40.
+PARAMETERS: p_wps     TYPE zsapbf_ppc_wps_req DEFAULT 10 MODIF ID 40.
+PARAMETERS: p_wpssub  TYPE zsapbf_ppc_wps_req DEFAULT 1  MODIF ID 40. "Added by James Sung-Kon Kim 2011/03/02
+PARAMETERS: p_wpstot  TYPE zsapbf_ppc_wps_req DEFAULT 1 . " MODIF ID 40. "Added by James Sung-Kon Kim 2011/03/02
+
+PARAMETERS: p_del_hl TYPE ppc_mwdel_th DEFAULT 'X'  MODIF ID 40.
+PARAMETERS: p_wttime TYPE ppc_mwwaittime DEFAULT 20  MODIF ID 40.
+PARAMETERS: p_retryc TYPE ppc_retry_com DEFAULT 3  MODIF ID 40.
+PARAMETERS: p_retrys TYPE ppc_retry_sys DEFAULT 3  MODIF ID 40.
+PARAMETERS: p_retryr TYPE ppc_retry_res DEFAULT 3  MODIF ID 40.
+
+SELECTION-SCREEN END OF BLOCK b3.

@@ -1,0 +1,111 @@
+FUNCTION Z_FPM_GET_TOP5.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     REFERENCE(I_MONTH) LIKE  ZSPM_PARAM-ZMONTH
+*"     REFERENCE(I_PLANT) LIKE  ZSPM_PARAM-SWERK OPTIONAL
+*"     REFERENCE(I_SHOP) LIKE  ZSPM_BDMON-SHOP
+*"     REFERENCE(I_MAUEH) LIKE  ZSPM_OPTIME-MAUEH
+*"  TABLES
+*"      T_TOP5 STRUCTURE  ZSPM_TOP5
+*"----------------------------------------------------------------------
+  DATA : IT_TEMP  LIKE VIQMEL OCCURS 0 WITH HEADER LINE.
+  DATA : WA_BUDAT LIKE AFRU-BUDAT.
+  DATA : WA_STAT  LIKE JEST-STAT.
+
+  CLEAR : WA_OPTIME, WA_SUM_BREAK,
+          WA_S_DAY,  WA_E_DAY.
+
+  CLEAR : IT_TEMP, IT_TEMP[], IT_MONTH, IT_MONTH[].
+
+  CONCATENATE I_MONTH '01' INTO WA_S_DAY.
+
+  CALL FUNCTION 'LAST_DAY_OF_MONTHS'
+       EXPORTING
+            DAY_IN            = WA_S_DAY
+       IMPORTING
+            LAST_DAY_OF_MONTH = WA_E_DAY.
+
+  SELECT * INTO  CORRESPONDING FIELDS OF TABLE IT_TEMP
+           FROM  VIQMEL
+*          WHERE SWERK = I_PLANT
+           WHERE INGRP = I_SHOP
+           AND   QMART IN ('M1' , 'M2', 'M3')
+           AND   MSAUS = 'X'
+*          AND   AUSZT <> 0.
+           AND   AUSVN BETWEEN  WA_S_DAY    "//Start of Malfunction
+                           AND  WA_E_DAY .   "//Start of Malfunction
+  LOOP AT IT_TEMP.
+*    SELECT SINGLE BUDAT INTO WA_BUDAT
+*           FROM AFRU
+*           WHERE AUFNR = IT_TEMP-AUFNR
+*           AND   BUDAT BETWEEN WA_S_DAY AND WA_E_DAY.
+*    IF SY-SUBRC EQ 0.
+*      SELECT SINGLE A~STAT INTO WA_STAT
+*             FROM JEST  AS A
+*                 INNER JOIN AUFK AS B
+*                 ON A~OBJNR = B~OBJNR
+*             WHERE  B~AUFNR = IT_TEMP-AUFNR
+*             AND    A~STAT  = 'I0045'
+*             AND    A~INACT = SPACE.
+*      IF SY-SUBRC EQ 0.
+    MOVE-CORRESPONDING IT_TEMP TO IT_MONTH.
+    APPEND IT_MONTH.
+*      ENDIF.
+*    ENDIF.
+  ENDLOOP.
+
+  LOOP AT IT_MONTH.
+    CLEAR : WA_INTERVAL, TIME_TABLE, TIME_TABLE[].
+
+    TIME_TABLE-I_UNIT  = 'S'.
+    TIME_TABLE-E_UNIT  = I_MAUEH.
+    TIME_TABLE-I_VALUE = IT_MONTH-AUSZT.
+    APPEND TIME_TABLE.
+
+    CALL FUNCTION 'TIME_CONVERSION'
+         TABLES
+              TIME_TABLE = TIME_TABLE.
+
+    READ TABLE TIME_TABLE INDEX 1.
+
+    WA_INTERVAL = TIME_TABLE-E_VALUE.
+    MOVE  : WA_INTERVAL       TO IT_MONTH-AUSZT,
+            TIME_TABLE-E_UNIT TO IT_MONTH-MAUEH.
+    MODIFY IT_MONTH.
+
+  ENDLOOP.
+
+  SORT IT_MONTH BY AUSZT DESCENDING.
+
+  LOOP AT IT_MONTH WHERE EQUNR NE SPACE.
+    CHECK SY-TABIX <= 5.
+    MOVE-CORRESPONDING IT_MONTH TO T_TOP5.
+    MOVE SY-TABIX TO T_TOP5-NUMBER.
+
+    SELECT SINGLE KTEXT INTO T_TOP5-KTEXT
+              FROM  AUFK
+              WHERE AUFNR = IT_MONTH-AUFNR.
+
+    SELECT SINGLE B~LTXA1 INTO T_TOP5-LTXA1
+                  FROM  CAUFV AS A
+                        INNER JOIN AFVC AS B
+                        ON A~AUFPL = B~AUFPL
+                  WHERE A~AUFNR = IT_MONTH-AUFNR.
+
+    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+         EXPORTING
+              INPUT  = T_TOP5-EQUNR
+         IMPORTING
+              OUTPUT = T_TOP5-EQUNR.
+
+    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+         EXPORTING
+              INPUT  = T_TOP5-AUFNR
+         IMPORTING
+              OUTPUT = T_TOP5-AUFNR.
+
+    APPEND  T_TOP5.
+  ENDLOOP.
+
+ENDFUNCTION.

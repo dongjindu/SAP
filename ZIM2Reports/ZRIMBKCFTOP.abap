@@ -1,0 +1,133 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZRIMBKCFTOP                                                *
+*----------------------------------------------------------------------*
+TABLES : EKKO,
+         LFA1,
+         T052,
+         ZTREQHD,         " 수입의뢰 Header
+        *ZTREQHD,
+         ZTREQST,         " 수입의뢰 상태.
+        *ZTREQST,
+         ZTMLCHD,
+        *ZTMLCHD,
+         ZTMLCSG2,
+        *ZTMLCSG2,
+         ZTMLCSG910,
+        *ZTMLCSG910,
+         ZTLLCHD,
+        *ZTLLCHD,
+         ZTLLCSG23,
+        *ZTLLCSG23,
+         ZTTTHD,
+        *ZTTTHD,
+         ZTPUR,
+        *ZTPUR,
+         ZTIMIMG00,       " 수입시스템 Basig Config.
+         ZTIMIMGTX,
+         ZSBKCF,
+         SPOP.
+
+
+DATA : IT_ZTREQORJ     LIKE ZSMLCSG7O OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZTREQORJ_ORG LIKE ZSMLCSG7O OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSREQIL      LIKE ZSREQIL   OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSREQIL_ORG  LIKE ZSREQIL   OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSREQIT      LIKE ZSREQIT   OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSREQIT_ORG  LIKE ZSREQIT   OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSMLCSG8E     LIKE ZSMLCSG8E OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSMLCSG8E_ORG LIKE ZSMLCSG8E OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSMLCSG7G     LIKE ZSMLCSG7G OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSMLCSG7G_ORG LIKE ZSMLCSG7G OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSMLCSG7O     LIKE ZSMLCSG7O OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSMLCSG7O_ORG LIKE ZSMLCSG7O OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSMLCSG9O     LIKE ZSMLCSG9O OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSMLCSG9O_ORG LIKE ZSMLCSG9O OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSLLCOF       LIKE ZSLLCOF   OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSLLCOF_ORG   LIKE ZSLLCOF   OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSPURSG1      LIKE ZSPURSG1  OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSPURSG1_ORG  LIKE ZSPURSG1  OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSPURSG4      LIKE ZSPURSG4  OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSPURSG4_ORG  LIKE ZSPURSG4  OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSPURSG1G     LIKE ZSPURSG1G OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSPURSG1G_ORG LIKE ZSPURSG1G OCCURS 10 WITH HEADER LINE.
+
+DATA : IT_ZSTTSG5       LIKE ZSTTSG5   OCCURS 10 WITH HEADER LINE.
+DATA : IT_ZSTTSG5_ORG   LIKE ZSTTSG5   OCCURS 10 WITH HEADER LINE.
+
+*-----------------------------------------------------------------------
+* Internal Table Define
+*-----------------------------------------------------------------------
+DATA : IT_TAB          LIKE ZSBKCF OCCURS 0 WITH HEADER LINE.
+DATA : IT_ZSBKCF       LIKE ZSBKCF OCCURS 0 WITH HEADER LINE.
+DATA : IT_ZSBKCF_ORG   LIKE ZSBKCF OCCURS 0 WITH HEADER LINE.
+
+DATA: BEGIN OF    IT_LOCK OCCURS 0,
+      ZFREQNO     LIKE ZTREQHD-ZFREQNO,
+      ZFOPBN      LIKE ZTREQHD-ZFOPBN,
+END OF IT_LOCK.
+
+FIELD-SYMBOLS <FS_F>.
+
+*> TABLE CONTROL.
+CONTROLS  TC_1100 TYPE TABLEVIEW USING SCREEN 1100.
+
+DATA:    W_LFA1           LIKE   LFA1,
+         W_ADRC           LIKE   ADRC,
+         G_PARAM_LINE     TYPE   I.
+DATA : W_ERR_CHK(1)      TYPE C,
+       CANCEL_OPTION     TYPE C,
+       W_ROWMARK         TYPE C,
+       OPTION(1)         TYPE C,
+       F(20)             TYPE C,             " Field Name Alias
+       W_COUNT           TYPE I,             " 전체 COUNT
+       W_UPDATE_CNT      TYPE I,
+       LINE              TYPE I,
+       TEXTLEN           TYPE I,
+       W_BUTTON_ANSWER   TYPE C,
+       W_GUBUN           TYPE C,
+       ANTWORT           TYPE C,
+       W_ITEM_CNT        LIKE SY-TABIX,          " 품목 count
+       W_MAX_ZFAMDNO     LIKE ZTREQST-ZFAMDNO,
+       W_YN1             LIKE ZTIMIMG00-ZFRELYN1,
+       W_YN2             LIKE ZTIMIMG00-ZFRELYN1,
+       G_PARM_LINE       LIKE SY-TABIX,
+       W_TABIX           LIKE SY-TABIX,
+       W_SY_SUBRC        LIKE SY-SUBRC,
+       P_BUKRS           LIKE ZTIMIMG00-ZFBUKRS,
+*> 2001.06.18 KSB INSERT START
+       W_SUBRC           LIKE SY-SUBRC,
+*> 2001.06.18 KSB INSERT END.
+       W_LOOPLINES       LIKE SY-LOOPC,
+       W_COUNTER1        LIKE SY-LOOPC,
+       W_COUNTER         LIKE SY-LOOPC,
+       OK-CODE           LIKE SY-UCOMM,
+       W_OK_CODE         LIKE SY-UCOMM.
+*&---------------------------------------------------------------------*
+*&      Module  FILL_TC_SCR1100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE FILL_TC_SCR1100 OUTPUT.
+
+  W_LOOPLINES = SY-LOOPC.                             " LOOPING COUNT
+* LINE의 유효성 여부 검증.
+  IF TC_1100-CURRENT_LINE GT TC_1100-LINES.
+     EXIT FROM STEP-LOOP.
+  ENDIF.
+* Internal Table Read ( Line별 )
+  READ TABLE IT_ZSBKCF INDEX TC_1100-CURRENT_LINE.
+  IF SY-SUBRC = 0.                                   " READ SUCCESS?
+     MOVE-CORRESPONDING  IT_ZSBKCF  TO  ZSBKCF.
+  ENDIF.
+
+ENDMODULE.                 " FILL_TC_SCR1100  OUTPUT

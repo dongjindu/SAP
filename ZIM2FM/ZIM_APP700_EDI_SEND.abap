@@ -1,0 +1,498 @@
+FUNCTION ZIM_APP700_EDI_SEND.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(W_ZFREQNO) LIKE  ZTREQHD-ZFREQNO
+*"     VALUE(W_ZFDHENO) LIKE  ZTDHF1-ZFDHENO
+*"  EXCEPTIONS
+*"      DB_ERROR
+*"----------------------------------------------------------------------
+
+   CALL FUNCTION 'ZIM_GET_MASTER_LC_DATA'
+        EXPORTING
+              ZFREQNO           =       W_ZFREQNO
+        IMPORTING
+              W_ZTMLCHD         =       ZTMLCHD
+              W_ZTMLCSG2        =       ZTMLCSG2
+              W_ZTMLCSG910      =       ZTMLCSG910
+        TABLES
+              IT_ZSMLCSG7G      =       IT_ZSMLCSG7G
+              IT_ZSMLCSG7O      =       IT_ZSMLCSG7O
+              IT_ZSMLCSG8E      =       IT_ZSMLCSG8E
+              IT_ZSMLCSG9O      =       IT_ZSMLCSG9O
+              IT_ZSMLCSG7G_ORG  =       IT_ZSMLCSG7G_ORG
+              IT_ZSMLCSG7O_ORG  =       IT_ZSMLCSG7O_ORG
+              IT_ZSMLCSG8E_ORG  =       IT_ZSMLCSG8E_ORG
+              IT_ZSMLCSG9O_ORG  =       IT_ZSMLCSG9O_ORG
+        EXCEPTIONS
+              NOT_FOUND     =       4
+              NOT_INPUT     =       8.
+
+   CASE SY-SUBRC.
+      WHEN 4.
+         MESSAGE E018 WITH W_ZFREQNO.
+      WHEN 8.
+         MESSAGE E019.
+   ENDCASE.
+
+*-----------------------------------------------------------------------
+* internal Table Append
+*-----------------------------------------------------------------------
+   REFRESH : IT_ZTDDF1.
+   CLEAR : IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDENO = W_ZFDHENO.
+*>>> 전자문서 시?
+   IT_ZTDDF1-ZFDDFDA = '{10'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '460'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = W_ZFDHENO.        APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFEDFN.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = 'AB'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}10'.            APPEND IT_ZTDDF1.
+*>>> 신용장 종?
+   IT_ZTDDF1-ZFDDFDA = '{11'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFLCTY.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}11'.            APPEND IT_ZTDDF1.
+*>>> 개설방?
+   IT_ZTDDF1-ZFDDFDA = '{12'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '1'.              APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '5'.              APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFOPME.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}12'.            APPEND IT_ZTDDF1.
+*>>> 확인지시문?
+   IF NOT ZTMLCHD-ZFCNIS IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = '{12'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '1'.            APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '4'.            APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFCNIS. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '}12'.          APPEND IT_ZTDDF1.
+   ENDIF.
+*>>> 수수료 부담?
+   IT_ZTDDF1-ZFDDFDA = '{13'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFCHG.    APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}13'.            APPEND IT_ZTDDF1.
+*>>> 개설신청일?
+   IT_ZTDDF1-ZFDDFDA = '{14'.                 APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '2AA'.                 APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTREQST-ZFAPPDT+2(6).  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '101'.                 APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}14'.                 APPEND IT_ZTDDF1.
+*>>> 서류제시기?
+   IF NOT ZTMLCHD-ZFPFPR IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = '{14'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '272'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFPFPR. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '804'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '}14'.          APPEND IT_ZTDDF1.
+   ENDIF.
+*>>> 환적/분할선적 허용여?
+   IT_ZTDDF1-ZFDDFDA = '{15'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFTRMT.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFPRMT.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}15'.            APPEND IT_ZTDDF1.
+*>>> 신용공여주?
+   IF NOT ZTMLCHD-ZFPAGR IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = '{16'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFPAGR. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '}16'.          APPEND IT_ZTDDF1.
+   ENDIF.
+*>>> 지급조?
+   DO 4 TIMES.
+      IF NOT ( ZTMLCHD-ZFTRTX1  IS INITIAL AND
+               ZTMLCHD-ZFTRTX2  IS INITIAL AND
+               ZTMLCHD-ZFTRTX3  IS INITIAL AND
+               ZTMLCHD-ZFTRTX4  IS INITIAL ).
+         CASE SY-INDEX.
+            WHEN 1.   ASSIGN ZTMLCHD-ZFTRTX1 TO <FS_F>.
+            WHEN 2.   ASSIGN ZTMLCHD-ZFTRTX2 TO <FS_F>.
+            WHEN 3.   ASSIGN ZTMLCHD-ZFTRTX3 TO <FS_F>.
+            WHEN 4.   ASSIGN ZTMLCHD-ZFTRTX4 TO <FS_F>.
+         ENDCASE.
+         IF NOT <FS_F> IS INITIAL.
+            IF ZTMLCHD-ZFTRMB NE '2AO' AND SY-INDEX NE 4.
+               IT_ZTDDF1-ZFDDFDA = '{17'.          APPEND IT_ZTDDF1.
+               CASE ZTMLCHD-ZFTRMB.
+                  WHEN '2AO'.  IT_ZTDDF1-ZFDDFDA = '2AB'.
+                  WHEN '2AM'.  IT_ZTDDF1-ZFDDFDA = '6'.
+                  WHEN '2AN'.  IT_ZTDDF1-ZFDDFDA = '4'.
+               ENDCASE.
+               APPEND IT_ZTDDF1.
+               IT_ZTDDF1-ZFDDFDA = <FS_F>.         APPEND IT_ZTDDF1.
+               IT_ZTDDF1-ZFDDFDA = '}17'.          APPEND IT_ZTDDF1.
+            ENDIF.
+         ENDIF.
+      ENDIF.
+   ENDDO.
+*>>> 기타조?
+   IF NOT ZTMLCHD-ZFETC1  IS INITIAL OR NOT ZTMLCHD-ZFETC2 IS INITIAL
+    OR NOT ZTMLCHD-ZFETC3  IS INITIAL OR NOT ZTMLCHD-ZFETC4 IS INITIAL
+    OR NOT ZTMLCHD-ZFETC5  IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = '{18'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = 'ACB'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFETC1. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFETC2. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFETC3. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFETC4. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFETC5. APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '}18'.          APPEND IT_ZTDDF1.
+   ENDIF.
+*>>> 개설은?
+   IT_ZTDDF1-ZFDDFDA = '{19'.            APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = 'AW'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFOPBNCD. APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFOBNM.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFOBBR.   APPEND IT_ZTDDF1.
+*>>> 개설은행  전화번?
+   IF NOT ZTMLCHD-ZFOBPH IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFOBPH.   APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = 'TE'.             APPEND IT_ZTDDF1.
+   ELSE.
+      IT_ZTDDF1-ZFDDFDA = ''.               APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ''.               APPEND IT_ZTDDF1.
+   ENDIF.
+   IT_ZTDDF1-ZFDDFDA = '}19'.            APPEND IT_ZTDDF1.
+*>>> 통지은?
+   IF NOT ZTMLCHD-ZFABNM IS INITIAL OR NOT ZTMLCHD-ZFABBR IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = '{19'.            APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '2AA'.            APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ''.               APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFABNM.   APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFABBR.   APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ''.               APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ''.               APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = '}19'.            APPEND IT_ZTDDF1.
+   ENDIF.
+*>>> 개설의뢰?
+   IT_ZTDDF1-ZFDDFDA = '{1A'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = 'DF'.              APPEND IT_ZTDDF1.
+*   IT_ZTDDF1-ZFDDFDA = ''.                APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFAPPNM.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFAPPAD1. APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFAPPAD2. APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFAPPAD3. APPEND IT_ZTDDF1.
+   DO 7 TIMES.
+      IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+   ENDDO.
+   IF NOT ZTMLCSG2-ZFTELNO IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFTELNO.  APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = 'TE'.              APPEND IT_ZTDDF1.
+   ELSE.
+      IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+   ENDIF.
+   IT_ZTDDF1-ZFDDFDA = '}1A'.             APPEND IT_ZTDDF1.
+*>>> 수익?
+   IT_ZTDDF1-ZFDDFDA = '{1A'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = 'DG'.              APPEND IT_ZTDDF1.
+*   IT_ZTDDF1-ZFDDFDA = ''.                APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFBENI1.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFBENI2.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFBENI3.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFBENI4.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFBENIA.  APPEND IT_ZTDDF1.
+   DO 8 TIMES.
+      IT_ZTDDF1-ZFDDFDA = ''.                APPEND IT_ZTDDF1.
+   ENDDO.
+   IT_ZTDDF1-ZFDDFDA = '}1A'.             APPEND IT_ZTDDF1.
+*>>> 전자서?
+   IT_ZTDDF1-ZFDDFDA = '{1A'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '2AE'.             APPEND IT_ZTDDF1.
+   DO 5 TIMES.
+      IT_ZTDDF1-ZFDDFDA = ''.                APPEND IT_ZTDDF1.
+   ENDDO.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFELENM.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFREPRE.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFELEID.  APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFELEAD1. APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCSG2-ZFELEAD2. APPEND IT_ZTDDF1.
+   DO 3 TIMES.
+      IT_ZTDDF1-ZFDDFDA = ''.                APPEND IT_ZTDDF1.
+   ENDDO.
+   IT_ZTDDF1-ZFDDFDA = '}1A'.             APPEND IT_ZTDDF1.
+*>>> 유효기일 / 장?
+   IT_ZTDDF1-ZFDDFDA = '{1B'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '123'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFEXDT.    APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '101'.               APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '143'.               APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFEXPL+2(6). APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}1B'.               APPEND IT_ZTDDF1.
+*>>> 개설금액 및 부가금액 / 과부족 허용?
+   WRITE   ZTMLCHD-ZFOPAMT    TO      W_TEXT_AMOUNT
+                         CURRENCY     ZTMLCHD-WAERS.
+   PERFORM    P2000_WRITE_NO_MASK     CHANGING  W_TEXT_AMOUNT.
+   IT_ZTDDF1-ZFDDFDA = '{1C'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '212'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = W_TEXT_AMOUNT.     APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-WAERS.     APPEND IT_ZTDDF1.
+   IF NOT ZTMLCHD-ZFAAMT1 IS INITIAL OR
+      NOT ZTMLCHD-ZFAAMT2 IS INITIAL OR
+      NOT ZTMLCHD-ZFAAMT3 IS INITIAL OR
+      NOT ZTMLCHD-ZFAAMT4 IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = 'ABT'.          APPEND IT_ZTDDF1.
+   ELSE.
+      IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+   ENDIF.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFAAMT1.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFAAMT2.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFAAMT3.   APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFAAMT4.   APPEND IT_ZTDDF1.
+* 과부족 허용?
+   IF NOT ZTMLCHD-ZFALCQ IS INITIAL.
+      IT_ZTDDF1-ZFDDFDA = '{20'.          APPEND IT_ZTDDF1.
+      IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFALCQ. APPEND IT_ZTDDF1.
+      IF NOT ZTMLCHD-ZFALCP IS INITIAL.
+         IT_ZTDDF1-ZFDDFDA = '13'.           APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFALCP. APPEND IT_ZTDDF1.
+      ELSE.
+         IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+      ENDIF.
+      IT_ZTDDF1-ZFDDFDA = '}20'.          APPEND IT_ZTDDF1.
+   ENDIF.
+   IT_ZTDDF1-ZFDDFDA = '}1C'.             APPEND IT_ZTDDF1.
+*>>> 선적항/도착항/최종선적기?
+   DO 2 TIMES.
+      IF SY-INDEX EQ 1.    " 선적?
+         IT_ZTDDF1-ZFDDFDA = '{1D'.             APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = '149'.             APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFSPRT.    APPEND IT_ZTDDF1.
+      ELSE.                " 도착?
+         IT_ZTDDF1-ZFDDFDA = '{1D'.             APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = '148'.             APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFAPRT.    APPEND IT_ZTDDF1.
+      ENDIF.
+      IF NOT ZTMLCHD-ZFLTSD IS INITIAL.
+         IT_ZTDDF1-ZFDDFDA = '38'.                APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFLTSD+2(6). APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = '101'.               APPEND IT_ZTDDF1.
+      ELSE.
+         IT_ZTDDF1-ZFDDFDA = ''.              APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ''.              APPEND IT_ZTDDF1.
+         IT_ZTDDF1-ZFDDFDA = ''.              APPEND IT_ZTDDF1.
+      ENDIF.
+      IF ZTMLCHD-ZFLTSD IS INITIAL.
+         IF NOT ZTMLCHD-ZFSHPR1 IS INITIAL OR
+            NOT ZTMLCHD-ZFSHPR2 IS INITIAL OR
+            NOT ZTMLCHD-ZFSHPR3 IS INITIAL.
+            IT_ZTDDF1-ZFDDFDA = '{21'.             APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = '2AF'.             APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFSHPR1.   APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFSHPR2.   APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFSHPR3.   APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = '}21'.             APPEND IT_ZTDDF1.
+         ENDIF.
+      ENDIF.
+      IT_ZTDDF1-ZFDDFDA = '}1D'.             APPEND IT_ZTDDF1.
+   ENDDO.
+*>>> 인도조건/상품명?
+   IT_ZTDDF1-ZFDDFDA = '{1E'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-INCO1.     APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFINCN.    APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '{22'.             APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '1'.               APPEND IT_ZTDDF1.
+   DO 3 TIMES.
+      IT_ZTDDF1-ZFDDFDA = ''.                APPEND IT_ZTDDF1.
+   ENDDO.
+   IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFINCP.    APPEND IT_ZTDDF1.
+   IT_ZTDDF1-ZFDDFDA = '}22'.             APPEND IT_ZTDDF1.
+
+   LOOP AT IT_ZSMLCSG7G.
+      W_MOD = SY-TABIX MOD 5.
+      CASE W_MOD.
+         WHEN 1.
+           IT_ZTDDF1-ZFDDFDA = '{23'.                APPEND IT_ZTDDF1.
+           IT_ZTDDF1-ZFDDFDA = 'AAA'.                APPEND IT_ZTDDF1.
+           IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG7G-ZFDSOG1. APPEND IT_ZTDDF1.
+         WHEN 0.
+           IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG7G-ZFDSOG1. APPEND IT_ZTDDF1.
+           IT_ZTDDF1-ZFDDFDA = '}23'.                APPEND IT_ZTDDF1.
+         WHEN OTHERS.
+           IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG7G-ZFDSOG1. APPEND IT_ZTDDF1.
+      ENDCASE.
+   ENDLOOP.
+   IF W_MOD NE 0.
+      W_MOD = 5 - W_MOD.
+      DO W_MOD TIMES.
+           IT_ZTDDF1-ZFDDFDA = ''.        APPEND IT_ZTDDF1.
+      ENDDO.
+      IT_ZTDDF1-ZFDDFDA = '}23'.          APPEND IT_ZTDDF1.
+   ENDIF.
+   IT_ZTDDF1-ZFDDFDA = '}1E'.             APPEND IT_ZTDDF1.
+*>>> 기타부가조?
+   DO 5 TIMES.
+      CASE SY-INDEX.
+         WHEN 1.   ASSIGN ZTMLCHD-ZFADCD1 TO <FS_F>.
+         WHEN 2.   ASSIGN ZTMLCHD-ZFADCD2 TO <FS_F>.
+         WHEN 3.   ASSIGN ZTMLCHD-ZFADCD3 TO <FS_F>.
+         WHEN 4.   ASSIGN ZTMLCHD-ZFADCD4 TO <FS_F>.
+         WHEN 5.   ASSIGN ZTMLCHD-ZFADCD5 TO <FS_F>.
+      ENDCASE.
+      IF NOT <FS_F> IS INITIAL.
+         IT_ZTDDF1-ZFDDFDA = '{1F'.             APPEND IT_ZTDDF1.
+         CASE SY-INDEX.
+            WHEN 1.  IT_ZTDDF1-ZFDDFDA = '2AA'.      APPEND IT_ZTDDF1.
+            WHEN 2.  IT_ZTDDF1-ZFDDFDA = '2AB'.      APPEND IT_ZTDDF1.
+            WHEN 3.  IT_ZTDDF1-ZFDDFDA = '2AC'.      APPEND IT_ZTDDF1.
+            WHEN 4.  IT_ZTDDF1-ZFDDFDA = '2AD'.      APPEND IT_ZTDDF1.
+            WHEN 5.  IT_ZTDDF1-ZFDDFDA = '2AE'.      APPEND IT_ZTDDF1.
+         ENDCASE.
+* SHIPMENT BY
+         IF SY-INDEX EQ 1 AND NOT ZTMLCHD-ZFCARR IS INITIAL.
+            IT_ZTDDF1-ZFDDFDA = 'CA'.           APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = ZTMLCHD-ZFCARR. APPEND IT_ZTDDF1.
+         ELSE.
+            IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+            IT_ZTDDF1-ZFDDFDA = ''.             APPEND IT_ZTDDF1.
+         ENDIF.
+* OTHER ADDITIONAL CONDITIONS
+         IF SY-INDEX EQ 5.
+            LOOP AT IT_ZSMLCSG9O.
+               W_MOD = SY-TABIX MOD 5.
+               CASE W_MOD.
+                 WHEN 1.
+                   IT_ZTDDF1-ZFDDFDA = '{24'.         APPEND IT_ZTDDF1.
+                   IT_ZTDDF1-ZFDDFDA = 'ABS'.         APPEND IT_ZTDDF1.
+                   IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG9O-ZFODOC1.
+                                                      APPEND IT_ZTDDF1.
+                 WHEN 0.
+                   IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG9O-ZFODOC1.
+                                                      APPEND IT_ZTDDF1.
+                   IT_ZTDDF1-ZFDDFDA = '}24'.         APPEND IT_ZTDDF1.
+                 WHEN OTHERS.
+                   IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG9O-ZFODOC1.
+                                                      APPEND IT_ZTDDF1.
+               ENDCASE.
+            ENDLOOP.
+            IF W_MOD NE 0.
+               W_MOD = 5 - W_MOD.
+               DO W_MOD TIMES.
+                 IT_ZTDDF1-ZFDDFDA = ''.        APPEND IT_ZTDDF1.
+               ENDDO.
+               IT_ZTDDF1-ZFDDFDA = '}24'.       APPEND IT_ZTDDF1.
+            ENDIF.
+         ENDIF.
+         IT_ZTDDF1-ZFDDFDA = '}1F'.             APPEND IT_ZTDDF1.
+      ENDIF.
+   ENDDO.
+*>>> 주요 구비서?
+   DO 7 TIMES.
+      CASE SY-INDEX.
+*        WHEN 1.   ASSIGN ZTMLCSG910-ZFCOMYN TO <FS_F>.
+         WHEN 4.   ASSIGN ZTMLCSG910-ZFCOMYN TO <FS_F>.
+*        WHEN 2.   ASSIGN ZTMLCSG910-ZFOCEYN TO <FS_F>.
+         WHEN 7.   ASSIGN ZTMLCSG910-ZFOCEYN TO <FS_F>.
+         WHEN 3.   ASSIGN ZTMLCSG910-ZFAIRYN TO <FS_F>.
+*        WHEN 4.   ASSIGN ZTMLCSG910-ZFINYN  TO <FS_F>.
+         WHEN 1.   ASSIGN ZTMLCSG910-ZFINYN  TO <FS_F>.
+         WHEN 5.   ASSIGN ZTMLCSG910-ZFPACYN TO <FS_F>.
+         WHEN 6.   ASSIGN ZTMLCSG910-ZFCEOYN TO <FS_F>.
+*        WHEN 7.   ASSIGN ZTMLCSG910-ZFOTDYN TO <FS_F>.
+         WHEN 2.   ASSIGN ZTMLCSG910-ZFOTDYN TO <FS_F>.
+      ENDCASE.
+      IF NOT <FS_F> IS INITIAL.
+         IT_ZTDDF1-ZFDDFDA = '{1G'.             APPEND IT_ZTDDF1.
+         CASE SY-INDEX.
+*           WHEN 1.  IT_ZTDDF1-ZFDDFDA = '380'.      APPEND IT_ZTDDF1.
+            WHEN 4.  IT_ZTDDF1-ZFDDFDA = '380'.      APPEND IT_ZTDDF1.
+*           WHEN 2.  IT_ZTDDF1-ZFDDFDA = '705'.      APPEND IT_ZTDDF1.
+            WHEN 7.  IT_ZTDDF1-ZFDDFDA = '705'.      APPEND IT_ZTDDF1.
+            WHEN 3.  IT_ZTDDF1-ZFDDFDA = '740'.      APPEND IT_ZTDDF1.
+*           WHEN 4.  IT_ZTDDF1-ZFDDFDA = '530'.      APPEND IT_ZTDDF1.
+            WHEN 1.  IT_ZTDDF1-ZFDDFDA = '530'.      APPEND IT_ZTDDF1.
+            WHEN 5.  IT_ZTDDF1-ZFDDFDA = '271'.      APPEND IT_ZTDDF1.
+            WHEN 6.  IT_ZTDDF1-ZFDDFDA = '861'.      APPEND IT_ZTDDF1.
+*           WHEN 7.  IT_ZTDDF1-ZFDDFDA = '2AA'.      APPEND IT_ZTDDF1.
+            WHEN 2.  IT_ZTDDF1-ZFDDFDA = '2AA'.      APPEND IT_ZTDDF1.
+         ENDCASE.
+         CASE SY-INDEX.
+            WHEN 4.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFNOCOM. APPEND IT_ZTDDF1.
+            WHEN 5.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFNOPAC. APPEND IT_ZTDDF1.
+            WHEN OTHERS.
+              IT_ZTDDF1-ZFDDFDA = ''.                 APPEND IT_ZTDDF1.
+         ENDCASE.
+         CASE SY-INDEX.
+            WHEN 7.     " BILL OF LADING
+              IT_ZTDDF1-ZFDDFDA = '{26'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFOCEAC. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '{30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = 'CN'.               APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFOCEC1. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFOCEC2. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '}30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '{30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = 'NI'.               APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFOCEAN. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ''.                 APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '}30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '}26'.              APPEND IT_ZTDDF1.
+            WHEN 3.   " AIR BILL
+              IT_ZTDDF1-ZFDDFDA = '{26'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFAIRAC. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '{30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = 'CN'.               APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFAIRC1. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFAIRC2. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '}30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '{30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = 'NI'.               APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFAIRAN. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ''.                 APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '}30'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = '}26'.              APPEND IT_ZTDDF1.
+            WHEN 1.   " 보?
+              IT_ZTDDF1-ZFDDFDA = '{25'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = 'INS'.              APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFINCO1. APPEND IT_ZTDDF1.
+              IT_ZTDDF1-ZFDDFDA = ZTMLCSG910-ZFINCO2. APPEND IT_ZTDDF1.
+              DO 3 TIMES.
+                 IT_ZTDDF1-ZFDDFDA = ''.              APPEND IT_ZTDDF1.
+              ENDDO.
+              IT_ZTDDF1-ZFDDFDA = '}25'.              APPEND IT_ZTDDF1.
+            WHEN 2.   " 기?
+               LOOP AT IT_ZSMLCSG8E.
+                  W_MOD = SY-TABIX MOD 5.
+                  CASE W_MOD.
+                    WHEN 1.
+                      IT_ZTDDF1-ZFDDFDA = '{25'.      APPEND IT_ZTDDF1.
+*                     DO 3 TIMES.
+*                       IT_ZTDDF1-ZFDDFDA = ''.       APPEND IT_ZTDDF1.
+*                     ENDDO.
+                      IT_ZTDDF1-ZFDDFDA = 'ABX'.      APPEND IT_ZTDDF1.
+                      IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG8E-ZFOACD1.
+                                                      APPEND IT_ZTDDF1.
+                 WHEN 0.
+                      IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG8E-ZFOACD1.
+                                                      APPEND IT_ZTDDF1.
+                      IT_ZTDDF1-ZFDDFDA = '}25'.      APPEND IT_ZTDDF1.
+                 WHEN OTHERS.
+                      IT_ZTDDF1-ZFDDFDA = IT_ZSMLCSG8E-ZFOACD1.
+                                                      APPEND IT_ZTDDF1.
+               ENDCASE.
+            ENDLOOP.
+            IF W_MOD NE 0.
+               W_MOD = 5 - W_MOD.
+               DO W_MOD TIMES.
+                 IT_ZTDDF1-ZFDDFDA = ''.        APPEND IT_ZTDDF1.
+               ENDDO.
+               IT_ZTDDF1-ZFDDFDA = '}25'.       APPEND IT_ZTDDF1.
+            ENDIF.
+         ENDCASE.
+         IT_ZTDDF1-ZFDDFDA = '}1G'.             APPEND IT_ZTDDF1.
+      ENDIF.
+   ENDDO.
+
+   CALL FUNCTION 'ZIM_EDI_FLAT_ITEM_INSERT'
+        EXPORTING
+              W_ZFDHENO         =        W_ZFDHENO
+        TABLES
+              IT_ZTDDF1         =        IT_ZTDDF1
+        EXCEPTIONS
+              DB_ERROR         =         4.
+
+   IF SY-SUBRC NE 0.
+      MESSAGE E118 WITH W_ZFDHENO.
+   ENDIF.
+
+ENDFUNCTION.

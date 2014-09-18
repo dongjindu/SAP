@@ -1,0 +1,96 @@
+FUNCTION Z_F_EXCEL_UPLOAD.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     REFERENCE(FILENAME) LIKE  RLGRAP-FILENAME
+*"     REFERENCE(ITAB)
+*"     REFERENCE(BEGIN_LINE) TYPE  I
+*"  TABLES
+*"      OUTAB
+*"----------------------------------------------------------------------
+
+ TYPE-POOLS : SYDES.
+  DATA : IT_SYDES  TYPE SYDES_DESC,
+         W_TYPES   TYPE SYDES_TYPEINFO,
+         W_TYPES2  TYPE SYDES_TYPEINFO,
+         W_NAMES   TYPE SYDES_NAMEINFO,
+         G_FNAME(20),
+         W_CNT1    TYPE I,
+         W_CNT2    TYPE I.
+
+  FIELD-SYMBOLS : <F1>, <F2>.
+
+  DATA : L_TXT1(25), L_TXT2(25).
+  DATA : INTERN LIKE TABLE OF ALSMEX_TABLINE WITH HEADER LINE.
+  DATA : L_INDEX  TYPE SY-TABIX.
+  DATA : L_INDEX2 TYPE SY-TABIX.
+  DATA : L_DATE   TYPE SY-DATUM.
+  DATA : L_COL    TYPE I.
+  DATA : L_MANDT  TYPE I.
+
+*#1. excel file upload.
+  CALL FUNCTION 'ALSM_EXCEL_TO_INTERNAL_TABLE'
+    EXPORTING
+      FILENAME                = FILENAME
+      I_BEGIN_COL             = 1
+      I_BEGIN_ROW             = BEGIN_LINE
+      I_END_COL               = 100
+      I_END_ROW               = 30000
+    TABLES
+      INTERN                  = INTERN
+    EXCEPTIONS
+      INCONSISTENT_PARAMETERS = 1
+      UPLOAD_OLE              = 2
+      OTHERS                  = 3.
+  IF SY-SUBRC <> 0.
+    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+*#2. read internal table field name.
+  DESCRIBE FIELD OUTAB INTO IT_SYDES.
+  READ TABLE IT_SYDES-TYPES INTO W_TYPES INDEX 2.
+  L_COL =  W_TYPES-IDX_NAME - 1.
+  DELETE IT_SYDES-NAMES FROM 1 TO L_COL.
+
+  READ TABLE IT_SYDES-NAMES INTO W_NAMES WITH KEY NAME = 'MANDT'.
+  IF SY-SUBRC = 0.
+    DELETE TABLE IT_SYDES-NAMES FROM W_NAMES.
+    L_MANDT  = 1.
+  ENDIF.
+
+*#3. upload data into internal table.
+  LOOP AT INTERN.
+    AT NEW ROW.
+      CLEAR : OUTAB, L_COL.
+    ENDAT.
+    L_COL = INTERN-COL.
+    L_INDEX = W_TYPES-IDX_NAME + L_COL - 1 + L_MANDT.
+    READ TABLE IT_SYDES-NAMES  INTO W_NAMES  INDEX L_COL.
+    READ TABLE IT_SYDES-TYPES  INTO W_TYPES2
+                                WITH KEY IDX_NAME = L_INDEX.
+    CONCATENATE 'OUTAB-' W_NAMES-NAME INTO L_TXT1.
+    CONDENSE L_TXT1.
+    ASSIGN (L_TXT1) TO <F1>.
+    IF W_TYPES2-TYPE = 'C'.
+      <F1> = INTERN-VALUE.
+      IF <F1> CN '1234567890'.
+        TRANSLATE <F1> TO UPPER CASE.
+      ENDIF.
+
+    ELSEIF W_TYPES2-TYPE = 'D'.
+      PERFORM REMOVE_POINT USING    INTERN-VALUE
+                           CHANGING <F1>.
+    ELSEIF W_TYPES2-TYPE = 'P'.
+      PERFORM REMOVE_OTHER_CHAR USING    INTERN-VALUE
+                                CHANGING <F1>.
+    ELSE.
+      <F1> = INTERN-VALUE.
+    ENDIF.
+
+    AT END OF ROW.
+      APPEND OUTAB.
+    ENDAT.
+  ENDLOOP.
+
+ENDFUNCTION.

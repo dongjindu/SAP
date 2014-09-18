@@ -1,0 +1,63 @@
+FUNCTION ZIM_CC_TAX_CALCULATE_US.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  EXPORTING
+*"     REFERENCE(W_BROKER_FEE) LIKE  ZTIDSUS-ZFDUTY
+*"  CHANGING
+*"     VALUE(ZTIDSUS) LIKE  ZTIDSUS STRUCTURE  ZTIDSUS
+*"----------------------------------------------------------------------
+DATA: W_HS_CNT      TYPE  I,
+      W_DOC_CNT     TYPE  I,
+      W_DOC_AMT     LIKE  ZTIMIMG07-ZFSTAMT,
+      W_HS_AMT      LIKE  ZTIMIMG07-ZFSTAMT.
+
+  REFRESH : IT_DOC.
+  CLEAR : W_DOC_CNT, W_HS_CNT, W_DOC_AMT, W_HS_AMT, W_BROKER_FEE.
+
+*>> Broker Fee COMPUTE.
+  CLEAR  : ZTIMIMG07.
+  SELECT SINGLE *  FROM ZTIMIMG07
+  WHERE  ZFCUT     EQ   ZTIDSUS-ZFCTW
+  AND    ZFENTP    EQ   ZTIDSUS-ZFENTP
+  AND    ZFAPLDT   EQ   ( SELECT MAX( ZFAPLDT )  FROM ZTIMIMG07
+                          WHERE  ZFCUT   EQ  ZTIDSUS-ZFCTW ).
+
+  IF SY-SUBRC EQ 0.
+     ">> Standard document processing Fee
+     IF ZTIMIMG07-ZFSTDOC EQ 'LC'.
+        SELECT ZFREQNO  AS ZFIMDNO
+        INTO   CORRESPONDING FIELDS OF TABLE IT_DOC
+        FROM   ZTIVIT
+        WHERE  ZFIVNO   EQ ZTIDSUS-ZFIVNO
+        GROUP BY
+               ZFREQNO.
+        DESCRIBE TABLE IT_DOC LINES W_DOC_CNT.
+     ELSEIF ZTIMIMG07-ZFSTDOC EQ 'BL'.
+        SELECT ZFBLNO  AS ZFIMDNO
+        INTO   CORRESPONDING FIELDS OF TABLE IT_DOC
+        FROM   ZTIVIT
+        WHERE  ZFIVNO   EQ ZTIDSUS-ZFIVNO
+        GROUP BY
+               ZFBLNO.
+        DESCRIBE TABLE IT_DOC LINES W_DOC_CNT.
+     ELSE.
+        W_DOC_CNT  =  1.
+     ENDIF.
+     W_DOC_AMT  =  W_DOC_CNT * ZTIMIMG07-ZFSTAMT.
+
+     ">> Standard HS Code Processing Fee.
+     SELECT COUNT( * ) INTO W_HS_CNT
+     FROM   ZTIDSUSH
+     WHERE  ZFIVNO     EQ   ZTIDSUS-ZFIVNO.
+
+     W_HS_CNT  =  W_HS_CNT -  ZTIMIMG07-ZFSTHS.
+     IF W_HS_CNT LE 0.
+        W_HS_CNT  =  0.
+     ENDIF.
+     W_HS_AMT  =  W_HS_CNT * ZTIMIMG07-ZFADAMT.
+
+     W_BROKER_FEE =  W_DOC_AMT  +  W_HS_AMT.
+
+  ENDIF.
+
+ENDFUNCTION.

@@ -1,0 +1,58 @@
+FUNCTION Z_FMM_GET_RESULT_ENDPART_REQ.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  TABLES
+*"      IT_ENDPART STRUCTURE  ZTMM_END_PART
+*"----------------------------------------------------------------------
+  DATA : W_TOTAL LIKE ZTCA_IF_LOG-TOTAL    ,
+         W_TCODE LIKE SY-TCODE VALUE 'ME21',
+         WA_ZTCA_IF_LOG LIKE ZTCA_IF_LOG  .
+
+  DATA : W_SERIALNO LIKE ZTCA_IF_LOG-ZSLNO .
+  DATA : PRGID LIKE SY-REPID VALUE 'ZIMMGM22I_RETURN_ENDPART'.
+
+
+  DESCRIBE TABLE IT_ENDPART LINES W_TOTAL.
+  CHECK W_TOTAL <> 0.
+
+  SELECT SINGLE * FROM TSTC WHERE TCODE = W_TCODE.
+  IF SY-SUBRC NE 0.
+    MESSAGE E010 WITH W_TCODE.
+  ENDIF.
+
+*[ 0 ] Get Serial Number
+  CALL FUNCTION 'NUMBER_GET_NEXT'
+       EXPORTING
+            NR_RANGE_NR = '01'
+            OBJECT      = 'ZCCTR'
+       IMPORTING
+            NUMBER      = W_SERIALNO.
+  IF SY-SUBRC <> 0.
+    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+*[ 1 ] Data Insert to table ZTMM_END_PART.
+  LOOP AT IT_ENDPART.
+    IT_ENDPART-ZUSER = SY-UNAME.
+    IT_ENDPART-ZSDAT = SY-DATUM.
+    IT_ENDPART-ZSTIM = SY-UZEIT.
+    IT_ENDPART-ZEDAT = SY-DATUM.
+    IT_ENDPART-ZETIM = SY-UZEIT.
+    IT_ENDPART-ZMODE = 'U'.
+    UPDATE ZTMM_END_PART FROM IT_ENDPART.
+    IF SY-SUBRC <> 0.
+      IT_ENDPART-ZZRET    = 'E'.
+      IT_ENDPART-ZRESULT  = 'E'.
+      IT_ENDPART-ZMSG     = 'End Part not exist'.
+      IT_ENDPART-ZSLNO    = W_SERIALNO.
+    ELSE.
+      IT_ENDPART-ZZRET    = 'S'.
+      IT_ENDPART-ZRESULT  = 'S'.
+      IT_ENDPART-ZMSG     = 'Updated successfully'.
+      IT_ENDPART-ZSLNO    = W_SERIALNO.
+    ENDIF.
+    UPDATE ZTMM_END_PART FROM IT_ENDPART.
+    MODIFY IT_ENDPART.
+  ENDLOOP.
+ENDFUNCTION.

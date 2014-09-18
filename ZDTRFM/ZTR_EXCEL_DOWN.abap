@@ -1,0 +1,200 @@
+FUNCTION ZTR_EXCEL_DOWN.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(HIER) TYPE  CFHID2
+*"     VALUE(SKALV) TYPE  TS70SKAL_VOR DEFAULT '0'
+*"     VALUE(DECIM) TYPE  TS70SKAL_NACH DEFAULT '0'
+*"     VALUE(P_DATE) TYPE  SY-DATUM OPTIONAL
+*"  TABLES
+*"      TITLE
+*"      DATE
+*"      BEGINNING STRUCTURE  FDSR OPTIONAL
+*"      PLAN STRUCTURE  FDSR
+*"      ENDING STRUCTURE  FDSR OPTIONAL
+*"----------------------------------------------------------------------
+
+  DATA : BEGIN OF GT_DOWN OCCURS 0,
+           TEXT01(40),TEXT02(40),TEXT03(40),TEXT04(40),TEXT05(40),
+           TEXT06(40),TEXT07(40),"TEXT08(40),TEXT09(40),TEXT10(40),
+           DATA01(20),DATA02(20),DATA03(20),DATA04(20),DATA05(20),
+           DATA06(20),DATA07(20),DATA08(20),DATA09(20),DATA10(20),
+           DATA11(20),DATA12(20),DATA13(20),DATA14(20),DATA15(20),
+           DATA16(20),DATA17(20),DATA18(20),DATA19(20),DATA20(20),
+           DATA21(20),DATA22(20),DATA23(20),DATA24(20),DATA25(20),
+           DATA26(20),DATA27(20),DATA28(20),DATA29(20),DATA30(20),
+           DATA31(20),DATA32(20),DATA33(20),DATA34(20),DATA35(20),
+           DATA36(20),DATA37(20),DATA38(20),DATA39(20),DATA40(20),
+           DATA41(20),DATA42(20),DATA43(20),DATA44(20),DATA45(20),
+           DATA46(20),DATA47(20),DATA48(20),DATA49(20),DATA50(20),
+           DATA51(20),DATA52(20),DATA53(20),DATA54(20),DATA55(20),
+           DATA56(20),DATA57(20),DATA58(20),DATA59(20),DATA60(20),
+           DATA61(20),DATA62(20),DATA63(20),DATA64(20),DATA65(20),
+           DATA66(20),DATA67(20),DATA68(20),DATA69(20),DATA70(20),
+           DATA71(20),DATA72(20),DATA73(20),DATA74(20),DATA75(20),
+           DATA76(20),DATA77(20),DATA78(20),DATA79(20),DATA80(20),
+           DATA81(20),DATA82(20),DATA83(20),DATA84(20),DATA85(20),
+           DATA86(20),DATA87(20),DATA88(20),DATA89(20),DATA90(20),
+           DATA91(20),DATA92(20),DATA93(20),DATA94(20),DATA95(20),
+           DATA96(20),DATA97(20),DATA98(20),DATA99(20),DATA00(20),
+         END OF GT_DOWN.
+
+  DATA : CNT(2) TYPE N,
+         FIELDNAME(20).
+  FIELD-SYMBOLS <FS>.
+
+
+  PERFORM GET_HIERARCHY USING HIER.
+
+
+  REFRESH GT_DOWN.
+  CLEAR   GT_DOWN.
+  TITLE = 'Hierarchy Header'.
+  INSERT TITLE INDEX 1.
+  CLEAR TITLE.
+
+  INSERT TITLE INDEX 2.
+  INSERT TITLE INDEX 3.
+  INSERT TITLE INDEX 4.
+  INSERT TITLE INDEX 5.
+  TITLE = 'P/G'.
+  INSERT TITLE INDEX 6.
+  TITLE = 'Description'.
+  INSERT TITLE INDEX 7.
+*  INSERT TITLE INDEX 8.
+*  INSERT TITLE INDEX 9.
+*  INSERT TITLE INDEX 10.
+*
+  CLEAR CNT.
+  LOOP AT DATE.
+    AT FIRST.
+      WRITE : 'Beginning Balance' TO GT_DOWN-TEXT01.
+    ENDAT.
+    LOOP AT BEGINNING WHERE DATUM = DATE.
+      ADD 1 TO CNT.
+      CONCATENATE 'GT_DOWN-DATA' CNT INTO FIELDNAME.
+      ASSIGN (FIELDNAME) TO <FS>.
+*      <FS> = BEGINNING-DMSHB.
+      PERFORM CONVERT_AMT USING BEGINNING-DMSHB
+                                <FS>
+                                SKALV
+                                DECIM.
+    ENDLOOP.
+  ENDLOOP.
+  APPEND GT_DOWN.
+  CLEAR  GT_DOWN.
+
+  DATA : L_TEXT(40).
+
+  LOOP AT LT_HIER_TB.
+
+    SELECT SINGLE TXT40 INTO L_TEXT
+      FROM TKCHNT
+     WHERE LANGU = SY-LANGU
+       AND APPLC = 'KC'
+       AND KEYID = LT_HIER_TB-KEYID.
+
+*   Hierarchy node
+    IF SY-SUBRC = 0.
+
+      CONCATENATE 'GT_DOWN-TEXT' LT_HIER_TB-HSTEP+1(2) INTO FIELDNAME.
+      ASSIGN (FIELDNAME) TO <FS>.
+      <FS> = L_TEXT.
+
+    ELSE.
+
+      PERFORM GET_TEXT USING LT_HIER_TB-KEYID L_TEXT.
+
+      WRITE : LT_HIER_TB-KEYID  TO GT_DOWN-TEXT06,
+              L_TEXT            TO GT_DOWN-TEXT07.
+      CLEAR CNT.
+
+      LOOP AT DATE.
+        ADD 1 TO CNT.
+        LOOP AT PLAN WHERE GRUPP = LT_HIER_TB-KEYID
+                       AND DATUM = DATE.
+          CONCATENATE 'GT_DOWN-DATA' CNT INTO FIELDNAME.
+          ASSIGN (FIELDNAME) TO <FS>.
+*          <FS> = PLAN-DMSHB.
+
+          PERFORM CONVERT_AMT USING PLAN-DMSHB
+                                    <FS>
+                                    SKALV
+                                    DECIM.
+        ENDLOOP.
+      ENDLOOP.
+      APPEND GT_DOWN.
+      CLEAR  GT_DOWN.
+    ENDIF.
+  ENDLOOP.
+
+* Ending Balance
+  CLEAR CNT.
+  LOOP AT DATE.
+    AT FIRST.
+      WRITE : 'Ending Balance' TO GT_DOWN-TEXT01.
+    ENDAT.
+    LOOP AT ENDING WHERE DATUM = DATE.
+      ADD 1 TO CNT.
+      CONCATENATE 'GT_DOWN-DATA' CNT INTO FIELDNAME.
+      ASSIGN (FIELDNAME) TO <FS>.
+
+      PERFORM CONVERT_AMT USING ENDING-DMSHB
+                                <FS>
+                                SKALV
+                                DECIM.
+    ENDLOOP.
+  ENDLOOP.
+  APPEND GT_DOWN.
+  CLEAR  GT_DOWN.
+
+
+* Down
+  DATA : L_FILE_NAME  LIKE  IBIPPARMS-PATH.
+
+  CALL FUNCTION 'WS_FILENAME_GET'
+    EXPORTING
+      MASK             = '*.xls.'
+      MODE             = 'S'
+    IMPORTING
+      FILENAME         = L_FILE_NAME
+    EXCEPTIONS
+      INV_WINSYS       = 1
+      NO_BATCH         = 2
+      SELECTION_CANCEL = 3
+      SELECTION_ERROR  = 4
+      OTHERS           = 5.
+
+  IF SY-SUBRC <> 0 OR L_FILE_NAME IS INITIAL.
+    EXIT.
+  ENDIF.
+
+  DATA: LEN TYPE I.
+
+  LEN =  STRLEN( L_FILE_NAME ).
+  IF LEN > 4.
+    LEN = LEN - 4.
+    IF L_FILE_NAME+LEN(4) = '.xls'
+    OR L_FILE_NAME+LEN(4) = '.XLS'.
+      L_FILE_NAME = L_FILE_NAME(LEN).
+    ENDIF.
+  ENDIF.
+
+  CALL FUNCTION 'EXCEL_OLE_STANDARD_DAT'
+    EXPORTING
+      FILE_NAME                 = L_FILE_NAME
+    TABLES
+      DATA_TAB                  = GT_DOWN
+      FIELDNAMES                = TITLE
+    EXCEPTIONS
+      FILE_NOT_EXIST            = 1
+      FILENAME_EXPECTED         = 2
+      COMMUNICATION_ERROR       = 3
+      OLE_OBJECT_METHOD_ERROR   = 4
+      OLE_OBJECT_PROPERTY_ERROR = 5
+      INVALID_PIVOT_FIELDS      = 6
+      DOWNLOAD_PROBLEM          = 7
+      OTHERS                    = 8.
+
+
+ENDFUNCTION.

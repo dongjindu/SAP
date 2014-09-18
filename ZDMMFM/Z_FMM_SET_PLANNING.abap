@@ -1,0 +1,45 @@
+FUNCTION Z_FMM_SET_PLANNING.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  TABLES
+*"      IT_PLANNING STRUCTURE  ZTMM_PLANNING OPTIONAL
+*"----------------------------------------------------------------------
+*  DATA : TOTAL LIKE ZTCA_IF_LOG-TOTAL  ,
+*         ZSUCC LIKE ZTCA_IF_LOG-ZSUCC  ,
+*         I_ZTCA_IF_LOG LIKE ZTCA_IF_LOG.
+*
+*  DESCRIBE TABLE IT_PLANNING LINES TOTAL.
+*  CHECK TOTAL <> 0.
+*
+*  SELECT SINGLE * FROM TSTC WHERE TCODE = TCODE.
+*  IF SY-SUBRC NE 0.
+*    MESSAGE E010 WITH TCODE.
+*  ENDIF.
+*
+*  LOOP AT IT_PLANNING.
+*    UPDATE ZTMM_PLANNING FROM IT_PLANNING.
+*    IF SY-SUBRC <> 0.
+*      INSERT ZTMM_PLANNING FROM IT_PLANNING.
+*    ENDIF.
+*    ZSUCC = ZSUCC + 1.
+*    MODIFY IT_PLANNING.
+*  ENDLOOP.
+*
+*  I_ZTCA_IF_LOG-TCODE = TCODE.
+*  I_ZTCA_IF_LOG-TOTAL = TOTAL.
+*
+*  CALL FUNCTION 'Z_FCA_EAI_INTERFACE_LOG'
+*    EXPORTING
+*        I_ZTCA_IF_LOG         = I_ZTCA_IF_LOG
+*    IMPORTING
+*        E_ZTCA_IF_LOG         = E_ZTCA_IF_LOG
+** EXCEPTIONS
+**   UPDATE_FAILED              = 1
+**   NUMBER_RANGE_ERROR         = 2
+**   TCODE_DOES_NOT_EXIST       = 3
+**   OTHERS                     = 4
+*              .
+*SELECT * FROM ZTMM_PLANNING
+*         INTO CORRESPONDING FIELDS OF TABLE IT_PLANNING.
+
+ENDFUNCTION.

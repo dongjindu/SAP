@@ -1,0 +1,64 @@
+*&-------------------------------------------------------------*
+*& Report ZTCO_CK11_W
+*&-------------------------------------------------------------*
+*System name         : HMI SYSTEM
+*Sub system name     : ARCHIVE
+*Program name        : Archiving : ZTCO_CK11 (Write)
+*Program descrition  : Generated automatically by the ZHACR00800
+*Created on   : 20130521          Created by   : T00303
+*Changed on :                           Changed by    :
+*Changed descrition :
+*"-------------------------------------------------------------*
+REPORT ZTCO_CK11_W .
+
+***** Include TOP
+INCLUDE ZTCO_CK11_T .
+
+***** Selection screen.
+SELECTION-SCREEN BEGIN OF BLOCK B2 WITH FRAME TITLE TEXT-001.
+*SELECT-OPTIONS S_ARTNR FOR ZTCO_CK11-ARTNR.
+SELECT-OPTIONS S_BDATJ FOR ZTCO_CK11-BDATJ.
+*SELECT-OPTIONS S_COMPN FOR ZTCO_CK11-COMPN.
+*SELECT-OPTIONS S_INDX FOR ZTCO_CK11-INDX.
+*SELECT-OPTIONS S_KLVAR FOR ZTCO_CK11-KLVAR.
+*SELECT-OPTIONS S_KOKRS FOR ZTCO_CK11-KOKRS.
+SELECT-OPTIONS S_POPER FOR ZTCO_CK11-POPER.
+*SELECT-OPTIONS S_REFDT FOR ZTCO_CK11-REFDT.
+*SELECT-OPTIONS S_VERID FOR ZTCO_CK11-VERID.
+*SELECT-OPTIONS S_WERKS FOR ZTCO_CK11-WERKS.
+SELECTION-SCREEN SKIP 1.
+PARAMETERS: TESTRUN               AS CHECKBOX,
+            CREATE    DEFAULT  'X' AS CHECKBOX,
+            OBJECT    LIKE         ARCH_IDX-OBJECT
+                      DEFAULT 'ZTCO_CK11' NO-DISPLAY .
+SELECTION-SCREEN SKIP 1.
+PARAMETERS: COMMENT   LIKE ADMI_RUN-COMMENTS OBLIGATORY.
+SELECTION-SCREEN END OF BLOCK B2.
+
+***** Main login - common routine of include
+PERFORM ARCHIVE_PROCESS.
+
+***** Common routine
+INCLUDE ZITARCW.
+
+***** History for each object,
+***** processing required for each part defined,
+FORM OPEN_CURSOR_FOR_DB.
+  OPEN CURSOR WITH HOLD G_CURSOR FOR
+SELECT * FROM ZTCO_CK11
+*WHERE ARTNR IN S_ARTNR
+WHERE BDATJ IN S_BDATJ
+*AND COMPN IN S_COMPN
+*AND INDX IN S_INDX
+*AND KLVAR IN S_KLVAR
+*AND KOKRS IN S_KOKRS
+AND POPER IN S_POPER.
+*AND REFDT IN S_REFDT
+*AND VERID IN S_VERID
+*AND WERKS IN S_WERKS.
+ENDFORM.
+FORM MAKE_ARCHIVE_OBJECT_ID.
+
+
+
+ENDFORM.

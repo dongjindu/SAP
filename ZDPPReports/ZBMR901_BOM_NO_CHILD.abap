@@ -1,0 +1,1091 @@
+
+************************************************************************
+* Program Name      : ZBMR901_BOM_NO_CHILD
+* Author            : Yongping
+* Creation Date     : 2004.08.23.
+* Specifications By : Yongping
+* Pattern           :
+* Development Request No : UD1K911976
+* Addl Documentation:
+* Description       : Display no-child BOM list
+*
+* Modification Logs
+* Date       Developer    RequestNo    Description
+*
+*
+*
+************************************************************************
+
+REPORT ZBMR901_BOM_NO_CHILD  MESSAGE-ID ZMPP NO STANDARD PAGE HEADING.
+
+
+*****************************************************************
+*GLOBAL DATA
+*****************************************************************
+TABLES: MARA, MAST,STPO,STKO, STAS.
+
+DATA: C_PLANT LIKE MAST-WERKS VALUE 'P001'.
+DATA: C_ENGINE_PLANT LIKE MAST-WERKS VALUE 'E001'.
+DATA: C_TEST_CAR_1(2) TYPE C VALUE 'XX'.
+DATA: C_TEST_CAR_2(2) TYPE C VALUE 'XY'.
+DATA: C_FERT(4) TYPE C VALUE 'FERT'.
+DATA: C_HALB(4) TYPE C VALUE 'HALB'.
+DATA: P_EMENG LIKE RC29L-EMENG VALUE '1'.
+DATA: P_CAPID LIKE RC29L-CAPID VALUE 'PP01'.
+DATA: P_DATUV LIKE SY-DATUM.
+DATA: WA_CHK(01).
+DATA: OK_CODE LIKE SY-UCOMM.
+DATA: OK_SAVE LIKE SY-UCOMM.
+DATA: L_COUNTER TYPE I.
+DATA: I_LINES TYPE I.
+DATA: L_BEGIN LIKE SY-UZEIT.
+DATA: L_END LIKE SY-UZEIT.
+DATA: I_TOTAL_INPUT TYPE I.
+DATA: I_TOTAL_EXPL TYPE I.
+DATA: S_TOTAL_INPUT(8).
+DATA: S_TOTAL_EXPL(8).
+DATA: S_BEGIN(10).
+DATA: S_END(10).
+
+****************************************************************
+*INTERNAL TABLES
+****************************************************************
+
+DATA: BEGIN OF IT_MATERIAL OCCURS 0,
+        MATNR LIKE MAST-MATNR,  "MATERIA NO
+        WERKS LIKE MAST-WERKS,  "PLANT
+        STLAN LIKE MAST-STLAN,  "BOM USAGE
+        STLNR LIKE MAST-STLNR,  "BILL OF BOM
+        STLAL LIKE MAST-STLAL,  "ALTERNATIVE BOM
+        ANDAT LIKE MAST-ANDAT,  "CREATION DATE
+        AEDAT LIKE MAST-AEDAT,  "CHANGE DATE
+        MTART LIKE MARA-MTART,  "MATERIA TYPE
+        DATUV LIKE STPO-DATUV,  "VALID-FROM DATE
+        STLKN LIKE STPO-STLKN.
+DATA: END OF IT_MATERIAL.
+DATA: IT_RESULT LIKE IT_MATERIAL OCCURS 0 WITH HEADER LINE.
+DATA: BEGIN OF SELPOOL OCCURS 0.
+        INCLUDE STRUCTURE CSTMAT.
+DATA: END OF SELPOOL.
+DATA: BEGIN OF IT_OUTPUT OCCURS 0,
+        MATNR(25) ,  "MATERIA NO
+        WERKS(10) ,  "PLANT
+        STLAN(10) ,  "BOM USAGE
+        STLNR(10) ,  "BILL OF BOM
+        STLAL(10) ,  "ALTERNATIVE BOM
+        ANDAT LIKE MAST-ANDAT,  "CREATION DATE
+        AEDAT LIKE MAST-AEDAT,  "CHANGE DATE
+        MTART LIKE MARA-MTART.  "MATERIA TYPE
+DATA: END OF IT_OUTPUT.
+
+
+DATA : BEGIN OF IT_BOM_PARENTS OCCURS 0,
+        MATNR      LIKE   STPOV-MATNR,   "Material
+        WERKS      LIKE   STPOV-WERKS,   "Plant
+        STLAN      LIKE   STPOV-STLNR,   "USAGE
+        VWALT      LIKE   STPOV-VWALT,   "Alternative number
+        IDNRK      LIKE   STPOV-IDNRK,   "COMPONENT
+        MTART      LIKE   MARA-MTART,    "TYPE
+        DATUV      LIKE   STPOV-DATUV,   "Valid-from date
+        AENNR      LIKE   STPOV-AENNR,   "Change number
+       END   OF IT_BOM_PARENTS.
+
+
+*****************************************************************
+*END OF  DATA DECLARATION
+*****************************************************************
+
+
+*****************************************************************
+*SELECTION-SCREEN
+*****************************************************************
+SELECTION-SCREEN BEGIN OF BLOCK B2 WITH FRAME TITLE TEXT-001.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS: P_CASE1         RADIOBUTTON  GROUP RG   DEFAULT 'X'    .
+SELECTION-SCREEN COMMENT  (40) TEXT-002 FOR FIELD P_CASE1        .
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT  10(10) TEXT-005 FOR FIELD P_MATNR       .
+SELECT-OPTIONS: P_MATNR  FOR  MARA-MATNR.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN SKIP.
+
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS: P_CASE2         RADIOBUTTON  GROUP RG    .
+SELECTION-SCREEN COMMENT  (40) TEXT-003 FOR FIELD P_CASE2       .
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT  10(10) TEXT-005 FOR FIELD P_DATE1       .
+SELECT-OPTIONS: P_DATE1  FOR SY-DATUM DEFAULT SY-DATUM.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN SKIP.
+
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS: P_CASE3        RADIOBUTTON  GROUP RG               .
+SELECTION-SCREEN COMMENT  10(40) TEXT-004 FOR FIELD P_CASE3       .
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT  10(10) TEXT-005 FOR FIELD P_DATE2       .
+SELECT-OPTIONS: P_DATE2  FOR SY-DATUM DEFAULT SY-DATUM.
+SELECTION-SCREEN END OF LINE.
+
+
+SELECTION-SCREEN END   OF BLOCK B2.
+
+
+AT SELECTION-SCREEN .
+
+  PERFORM CHECK_INPUT_DATA.
+
+START-OF-SELECTION.
+  PERFORM CLEAR_VARIABLES.
+
+  P_DATUV = SY-DATUM.
+  L_BEGIN = SY-UZEIT.
+
+  PERFORM WRITE_PROGRESS.
+* READ MATERIALS
+  PERFORM READ_MATERIAL CHANGING WA_CHK.
+  IF WA_CHK EQ ' '.
+* CHECK MATERIAL BOM CHILD
+    PERFORM CHECK_BOM_CHILD.
+  ELSE.
+*      MESSAGE I000 WITH TEXT-009.
+  ENDIF.
+*CHECK THE RESULT FOR DELETED BOM ITEM
+  PERFORM RESULT_CHECK.
+* Get the parents of the result material
+  PERFORM GET_PARENTS.
+
+
+  GET TIME.
+  L_END = SY-UZEIT.
+
+
+END-OF-SELECTION.
+
+  PERFORM WRITE_RESULT.
+
+
+
+
+************************************************************************
+*
+********** FORMS*******************************************************
+*
+************************************************************************
+
+*&---------------------------------------------------------------------*
+*&      Form  check_input_data
+*&---------------------------------------------------------------------*
+*       CHECK THE USER INPUT DATE WHICH SHOULD
+*          BE NOT MORE THAN 7 DAYS
+*----------------------------------------------------------------------*
+*  -->  p1
+*  <--  p2
+*----------------------------------------------------------------------*
+FORM CHECK_INPUT_DATA.
+  DATA: L_DAYS TYPE I.
+  CASE 'X'.
+    WHEN P_CASE2.
+      L_DAYS = P_DATE1-HIGH - P_DATE1-LOW.
+      IF L_DAYS > 7.
+        MESSAGE E001 WITH TEXT-007.
+      ENDIF.
+
+    WHEN P_CASE3.
+      L_DAYS = P_DATE2-HIGH - P_DATE2-LOW.
+      IF L_DAYS > 7.
+        MESSAGE E001 WITH TEXT-007.
+      ENDIF.
+
+  ENDCASE.
+ENDFORM.                    " check_input_data
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_RESULT
+*&---------------------------------------------------------------------*
+*       DISPLAY THE RESULT  IN TABLE CONTROL
+*----------------------------------------------------------------------*
+*  -->  p1        INPUT CHECKING RESULT INTERNAL TABLE IT_RESULT
+*  <--  p2        DISPLAY IN TABLE CONTROL
+*----------------------------------------------------------------------*
+*FORM DISPLAY_RESULT.
+*  S_TOTAL_INPUT = I_TOTAL_INPUT.
+*  S_TOTAL_EXPL = I_TOTAL_EXPL.
+*  S_BEGIN = L_BEGIN.
+*  S_END = L_END.
+
+*  LOOP AT IT_RESULT.
+*    MOVE-CORRESPONDING IT_RESULT TO IT_OUTPUT.
+*    APPEND IT_OUTPUT.
+*  ENDLOOP.*
+*
+*  CALL SCREEN 100.
+*ENDFORM.                    " DISPLAY_RESULT
+
+
+*&---------------------------------------------------------------------*
+*&      Form  READ_MATERIAL
+*&---------------------------------------------------------------------*
+*      READ SOURCE DATA FROM DATABASE TABLE
+*      BASED ON THE USER INPUT
+*&---------------------------------------------------------------------*
+FORM READ_MATERIAL CHANGING P_CHK.
+  DATA: BEGIN OF LT_MAST OCCURS 0,
+          STLAL TYPE MAST-STLAL,
+        END OF LT_MAST.
+  DATA: LT_MATERIAL LIKE IT_MATERIAL OCCURS 0 WITH HEADER LINE.
+  DATA: LT_MATERIALX LIKE IT_MATERIAL OCCURS 0 WITH HEADER LINE.
+  DATA: WA_MATERIAL LIKE LT_MATERIAL.
+  DATA: I_COUNT TYPE I.
+  DATA: L_MTART LIKE MARA-MTART.
+  DATA: I_DELETED TYPE I.
+  DATA: S_NO_EXIST(1).
+  DATA: L_TABIX LIKE SY-TABIX.
+  RANGES: R_MAT FOR MARA-MATNR.
+  DATA: BEGIN OF LT_MAT OCCURS 0,
+         IDNRK LIKE STPO-IDNRK,
+         STLNR LIKE STPO-STLNR,
+         STLKN LIKE STPO-STLKN,
+         LKENZ LIKE STAS-LKENZ,
+         DATUV LIKE STPO-DATUV,
+        END OF LT_MAT.
+  DATA: BEGIN OF LT_PLANT OCCURS 0,
+          MATNR LIKE MARC-MATNR,
+          WERKS LIKE MARC-WERKS,
+        END OF LT_PLANT.
+
+  DATA: BEGIN OF LT_MATDEL OCCURS 0,
+          STLNR LIKE STPO-STLNR,
+          STLKN LIKE STPO-STLKN,
+          LKENZ LIKE STAS-LKENZ.
+  DATA: END OF LT_MATDEL.
+  CASE 'X'.
+    WHEN P_CASE1.
+*       "THE INPUT IS MATERIAL NUMBER
+*       "READ MATERIAL CAR FROM MAST TABLE
+      SELECT * INTO CORRESPONDING FIELDS OF TABLE IT_MATERIAL
+        FROM MAST WHERE MATNR IN P_MATNR .
+
+      IF SY-SUBRC <> 0.
+        S_NO_EXIST = 'X'.
+      ENDIF.
+
+*    READ  MATERAIL FROM TABLE STPO, BECASE SOMETIMES, HALB BOM ITEM
+*    EXIST IN TABLE STPO BUT NO ENTRY IN HEADER TABLE MAST. SO READ
+*    AGAIN FROM ITEM TABLE
+      SELECT IDNRK STLKN STLNR
+       INTO CORRESPONDING FIELDS OF TABLE LT_MAT
+      FROM STPO
+      WHERE IDNRK IN P_MATNR .
+
+      IF SY-SUBRC = 0.
+        IF S_NO_EXIST = 'X'.
+          CLEAR S_NO_EXIST.
+        ENDIF.
+
+*       DELET INACTIVE ITEMS (DELETED ITEM, DELETE MARK IN TABLE STAS)
+        SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_MATDEL
+        FROM STAS
+        FOR ALL ENTRIES IN LT_MAT
+          WHERE STLNR = LT_MAT-STLNR AND
+                STLKN = LT_MAT-STLKN AND
+                LKENZ = 'X'.
+*        CHECK IF ITEM IS DELETED
+        SORT LT_MATDEL BY STLNR STLKN.
+        LOOP AT LT_MAT.
+          L_TABIX = SY-TABIX.
+          READ TABLE LT_MATDEL WITH KEY STLNR = LT_MAT-STLNR
+                                        STLKN = LT_MAT-STLKN.
+          IF SY-SUBRC = 0.
+            DELETE LT_MAT INDEX L_TABIX.
+          ENDIF.
+        ENDLOOP.
+
+      ENDIF.
+*COMBINE LT_MAT AND IT_MATERIAL TOGETHER
+      IF S_NO_EXIST <> 'X'.
+        LOOP AT LT_MAT.
+          READ TABLE IT_MATERIAL WITH KEY MATNR = LT_MAT-IDNRK.
+          IF SY-SUBRC <> 0.
+            IT_MATERIAL-MATNR = LT_MAT-IDNRK.
+            APPEND IT_MATERIAL.
+          ENDIF.
+        ENDLOOP.
+
+
+        DESCRIBE TABLE IT_MATERIAL LINES I_COUNT.
+        IF I_COUNT <> 0.
+* READ MATERIAL TYPE AND PLANT
+          SELECT MATNR MTART
+            INTO CORRESPONDING FIELDS OF TABLE LT_MATERIAL
+            FROM MARA
+            FOR ALL ENTRIES IN IT_MATERIAL
+            WHERE MATNR = IT_MATERIAL-MATNR.
+          IF SY-SUBRC <> 0.
+            MESSAGE E001 WITH TEXT-021.
+          ENDIF.
+* DELETE NON-FERT OR HALB MATERIAL AND STORE TYPE
+          LOOP AT IT_MATERIAL.
+            L_TABIX = SY-TABIX.
+            READ TABLE LT_MATERIAL WITH KEY MATNR = IT_MATERIAL-MATNR.
+            IF LT_MATERIAL-MTART <> C_FERT AND
+               LT_MATERIAL-MTART <> C_HALB.
+              DELETE IT_MATERIAL INDEX L_TABIX.
+              CONTINUE.
+            ELSE.
+              IT_MATERIAL-MTART = LT_MATERIAL-MTART.
+              MODIFY IT_MATERIAL.
+
+            ENDIF.
+
+          ENDLOOP.
+
+
+* READ PLANT FIELD
+          SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_PLANT
+           FROM MARC
+           FOR ALL ENTRIES IN IT_MATERIAL
+           WHERE MATNR = IT_MATERIAL-MATNR.
+          IF SY-SUBRC <> 0.
+            MESSAGE E001 WITH TEXT-021.
+          ENDIF.
+*STORE PLANT
+          LOOP AT IT_MATERIAL.
+            L_TABIX = SY-TABIX.
+            READ TABLE LT_PLANT WITH KEY MATNR = IT_MATERIAL-MATNR.
+            IF SY-SUBRC = 0.
+              IT_MATERIAL-WERKS = LT_PLANT-WERKS.
+              MODIFY IT_MATERIAL.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+
+        DESCRIBE TABLE IT_MATERIAL LINES I_COUNT.
+        IF I_COUNT = 0.
+          S_NO_EXIST = 'N'."NO FERT OR HALB
+        ENDIF.
+
+      ENDIF.
+* IF NO MATERIAL FIND FROM MAST OR STPO, LOOK UP MARA.
+      IF  S_NO_EXIST = 'X'.
+        SELECT * INTO CORRESPONDING FIELDS OF TABLE IT_MATERIAL
+          FROM MARA WHERE MATNR IN P_MATNR AND
+               ( MTART = 'FERT' OR MTART = 'HALB' ).
+        IF SY-SUBRC = 0.
+          S_NO_EXIST = 'Y'.
+          LOOP AT IT_MATERIAL.
+            MOVE IT_MATERIAL TO IT_RESULT.
+            APPEND  IT_RESULT.
+            DELETE IT_MATERIAL.
+          ENDLOOP.
+        ELSE.
+
+*           ELSE.   " MATERIAL DOES NOT EXIST.S_NO_EXIST = 'X'.
+
+        ENDIF.
+      ENDIF.
+
+
+    WHEN P_CASE2.
+*       " THE INPUT IS BOM CREATION/CHANGE DATE
+*       "READ MATERIAL FROM MAST
+      SELECT * INTO CORRESPONDING FIELDS OF TABLE IT_MATERIAL
+          FROM MAST WHERE ANDAT IN P_DATE1 OR AEDAT IN P_DATE1 .
+
+      IF SY-SUBRC <> 0.
+        S_NO_EXIST = 'X'.
+      ENDIF.
+
+*    READ  MATERAIL FROM TABLE STPO, BECASE SOMETIMES, HALB BOM ITEM
+*    EXIST IN TABLE STPO BUT NO ENTRY IN HEADER TABLE MAST. SO READ
+*      AGAIN FROM ITEM TABLE
+      SELECT IDNRK STLNR STLKN
+      INTO CORRESPONDING FIELDS OF TABLE LT_MAT
+      FROM STPO
+      WHERE ANDAT IN P_DATE1 OR AEDAT IN P_DATE1.
+
+      IF SY-SUBRC = 0.
+        IF S_NO_EXIST = 'X'.
+          CLEAR S_NO_EXIST.
+        ENDIF.
+
+*       DELET INACTIVE ITEMS (DELETED ITEM, DELETE MARK IN TABLE STAS)
+        SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_MATDEL
+          FROM STAS
+          FOR ALL ENTRIES IN LT_MAT
+            WHERE STLNR = LT_MAT-STLNR AND
+                  STLKN = LT_MAT-STLKN AND
+                  LKENZ = 'X'.
+*        CHECK IF ITEM IS DELETED
+        LOOP AT LT_MAT.
+          L_TABIX = SY-TABIX.
+          READ TABLE LT_MATDEL WITH KEY STLNR = LT_MAT-STLNR
+                                        STLKN = LT_MAT-STLKN.
+          IF SY-SUBRC = 0.
+            DELETE LT_MAT INDEX L_TABIX.
+          ENDIF.
+        ENDLOOP.
+
+      ENDIF.
+*  COMBINE LT_MAT AND IT_MATERIAL TOGETHER
+      IF S_NO_EXIST <> 'X'.
+        LOOP AT LT_MAT.
+          READ TABLE IT_MATERIAL WITH KEY MATNR = LT_MAT-IDNRK.
+          IF SY-SUBRC <> 0.
+            IT_MATERIAL-MATNR = LT_MAT-IDNRK.
+            APPEND IT_MATERIAL.
+          ENDIF.
+        ENDLOOP.
+
+
+        DESCRIBE TABLE IT_MATERIAL LINES I_COUNT.
+        IF I_COUNT <> 0.
+*        READ MATERIAL TYPE AND PLANT
+          SELECT MATNR MTART
+            INTO CORRESPONDING FIELDS OF TABLE LT_MATERIAL
+            FROM MARA
+            FOR ALL ENTRIES IN IT_MATERIAL
+            WHERE MATNR = IT_MATERIAL-MATNR.
+          IF SY-SUBRC <> 0.
+            MESSAGE E001 WITH TEXT-021.
+          ENDIF.
+*        DELETE NON-FERT OR HALB MATERIAL AND STORE TYPE
+          LOOP AT IT_MATERIAL.
+            L_TABIX = SY-TABIX.
+            READ TABLE LT_MATERIAL WITH KEY MATNR = IT_MATERIAL-MATNR.
+            IF LT_MATERIAL-MTART <> C_FERT AND
+               LT_MATERIAL-MTART <> C_HALB.
+              DELETE IT_MATERIAL INDEX L_TABIX.
+              CONTINUE.
+            ELSE.
+              IT_MATERIAL-MTART = LT_MATERIAL-MTART.
+              MODIFY IT_MATERIAL.
+
+            ENDIF.
+
+          ENDLOOP.
+
+
+*          READ PLANT FIELD
+          SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_PLANT
+           FROM MARC
+           FOR ALL ENTRIES IN IT_MATERIAL
+           WHERE MATNR = IT_MATERIAL-MATNR.
+          IF SY-SUBRC <> 0.
+            MESSAGE E001 WITH TEXT-021.
+          ENDIF.
+*         STORE PLANT
+          LOOP AT IT_MATERIAL.
+            L_TABIX = SY-TABIX.
+            READ TABLE LT_PLANT WITH KEY MATNR = IT_MATERIAL-MATNR.
+            IF SY-SUBRC = 0.
+              IT_MATERIAL-WERKS = LT_PLANT-WERKS.
+              MODIFY IT_MATERIAL.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+
+        DESCRIBE TABLE IT_MATERIAL LINES I_COUNT.
+
+      ENDIF.
+      IF I_COUNT = 0.
+        S_NO_EXIST = 'N'. "NO FERT OR HALB
+      ENDIF.
+
+    WHEN P_CASE3.
+*       "THE INPUT IS MATERIAL MASTER CREATION/CHANGE DATE
+*        READ DATA FROM MATERIAL MASTER TABLE MARA
+      SELECT A~MATNR A~MTART B~WERKS
+        INTO CORRESPONDING FIELDS OF TABLE IT_MATERIAL
+           FROM MARA AS A INNER JOIN MARC AS B
+             ON A~MATNR = B~MATNR
+             WHERE A~ERSDA IN P_DATE2 OR A~LAEDA IN P_DATE2 .
+
+      IF SY-SUBRC <> 0.
+        S_NO_EXIST = 'X'.
+      ELSE.
+
+*       CHECK THE MATERIAL TYPE AND DELETE ALL DATA THAT
+*       IS NOT 'HALB' OR 'FERT'
+        DELETE IT_MATERIAL WHERE MTART <> C_FERT AND MTART <> C_HALB.
+
+
+*         CHECK IF MATERIAL TABLE IS EMPTY
+        DESCRIBE TABLE IT_MATERIAL LINES I_COUNT.
+        IF I_COUNT = 0.
+          S_NO_EXIST = 'N'.
+        ENDIF.
+*
+
+        CLEAR LT_MATERIAL. REFRESH LT_MATERIAL.
+        LT_MATERIALX[] = IT_MATERIAL[].
+*      "GET OTHER INFO FOR IT_MATERIAL FROM mast
+        LOOP AT LT_MATERIALX.
+          SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_MATERIAL
+            FROM MAST WHERE MATNR EQ LT_MATERIALX-MATNR.
+          IF SY-SUBRC EQ 0.
+*              "REPLACE INFORMATION  OF IT_MATERIAL
+            DELETE TABLE IT_MATERIAL FROM LT_MATERIALX.
+            LOOP AT LT_MATERIAL.
+              LT_MATERIAL-MTART = LT_MATERIALX-MTART.
+              APPEND LT_MATERIAL TO IT_MATERIAL.
+            ENDLOOP.
+
+          ELSE.
+            MOVE LT_MATERIALX TO IT_RESULT.
+            APPEND  IT_RESULT.
+            DELETE TABLE IT_MATERIAL FROM LT_MATERIALX.
+            I_DELETED = I_DELETED + 1.
+          ENDIF.
+        ENDLOOP.
+
+
+*    CHECK IF IT_MATERIAL IS EMPTY
+        DESCRIBE TABLE IT_MATERIAL LINES I_COUNT.
+        IF I_COUNT = 0 .
+          S_NO_EXIST = 'Y'.  "NO-BOM HALB MATERIAL EXIST
+        ENDIF.
+
+      ENDIF.
+  ENDCASE.
+*TRANSFER THE STATUS
+  P_CHK = S_NO_EXIST.
+
+ENDFORM.                    " READ_PROCESS
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       SET THE GUI STATUS
+*----------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  CHECK_BOM_CHILD
+*&---------------------------------------------------------------------*
+*       CHECK THE MATERIAL BOM AND IT'S CHILDREN
+*----------------------------------------------------------------------*
+*  -->  p1        INPUT MATERIAL LIST INTERNAL TABLE IT_MATERIAL
+*  <--  p2        OUTPUT CHECKING RESULT INTERNAL TABLE IT_RESULT
+*----------------------------------------------------------------------*
+FORM CHECK_BOM_CHILD.
+*
+  DATA: LT_COMP_ALL TYPE TABLE OF STPOX WITH HEADER LINE.
+  DATA: LT_COMP_SINGLE TYPE TABLE OF STPOX WITH HEADER LINE.
+  DATA: LT_MATERIAL LIKE IT_MATERIAL OCCURS 0 WITH HEADER LINE.
+  DATA: LT_MATERIAL_REDUCED  LIKE IT_MATERIAL OCCURS 0 WITH HEADER LINE.
+  DATA: L_STATUS TYPE I.
+  DATA: L_COUNT TYPE I.
+  DATA: L_IDNRK LIKE STPOX-IDNRK,
+        L_STLAN LIKE STPOX-STLAN,
+        L_STLAL LIKE STPOX-STLAL,
+        L_MTART LIKE STPOX-MTART,
+        L_ANDAT LIKE STPOX-ANDAT,
+        L_AEDAT LIKE STPOX-AEDAT,
+        L_DATUV LIKE STPOX-DATUV,
+        L_WERKS LIKE STPOX-WERKS.
+  DATA:L_PROGRESS(50).
+  DATA:L_COUNTERC(10).
+*LOOP THE MATERIAL AND EXPLODE IT AT SINGLE LEVEL AND PUT ALL THE
+*RESULT INTO TABLE LT_COMP FOR FURTHER CHECK.
+  DESCRIBE TABLE IT_MATERIAL LINES L_COUNT.
+  IF L_COUNT = 0.
+    MESSAGE E001 WITH TEXT-008.
+    EXIT.
+  ENDIF.
+  L_COUNTER = L_COUNTER + 1.  "COUNT TIMES THIS ROUTINE CALLED
+  LT_MATERIAL[] = IT_MATERIAL[].
+  LOOP AT LT_MATERIAL.
+*DISPLAY THE PROGRESS STATUS
+    L_COUNTERC = I_TOTAL_EXPL.
+    CONCATENATE TEXT-012 L_COUNTERC INTO L_PROGRESS.
+*     CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+*          EXPORTING TEXT = L_PROGRESS.  "THIS TAKE TOO MUCH TIME!!
+
+    PERFORM BOM_EXPLODE_SINGLE TABLES LT_COMP_SINGLE
+                               USING LT_MATERIAL-MATNR
+                                     LT_MATERIAL-STLAN
+                                     LT_MATERIAL-STLAL
+                                     LT_MATERIAL-WERKS
+                               CHANGING L_STATUS.
+*CHECK THE RESULT
+    IF L_STATUS IS INITIAL.
+*STORE THE EXPLODED RESULT
+      LOOP AT LT_COMP_SINGLE.
+        APPEND LT_COMP_SINGLE TO LT_COMP_ALL.
+      ENDLOOP.
+      CLEAR LT_COMP_SINGLE.
+      FREE LT_COMP_SINGLE.
+    ELSEIF L_STATUS = 1.
+* CHECK IF THIS IS NOT A ENGINE PART WHICH HAS BOM IN PLANT E001
+*        SELECT COUNT(*) FROM MAST WHERE MATNR = LT_MATERIAL-MATNR AND
+*                                WERKS = C_ENGINE_PLANT.
+*        IF SY-SUBRC <> 0.
+
+* NO BOM, STORE THE ERROR MATERIAL
+      APPEND LT_MATERIAL TO IT_RESULT.
+      CLEAR L_STATUS.
+*        ENDIF.
+    ELSEIF L_STATUS = 2.
+      MESSAGE E001 WITH TEXT-010.
+*       EXIT.
+    ENDIF.
+    CLEAR L_STATUS.
+  ENDLOOP.
+* LT_COMP_ALL INCLUDES SINGLE LEVEL EXPLODED COMPONENTS
+*DELETE THE DUPLECATE RECORD
+  SORT LT_COMP_ALL BY IDNRK STLAN STLAL.
+*  DELETE ADJACENT DUPLICATES  FROM LT_COMP_ALL
+*           COMPARING IDNRK STLAN STLAL.
+  READ TABLE LT_COMP_ALL INDEX 1.
+  L_IDNRK = LT_COMP_ALL-IDNRK.
+  L_STLAN = LT_COMP_ALL-STLAN.
+  L_STLAL = LT_COMP_ALL-STLAL.
+  L_MTART = LT_COMP_ALL-MTART.
+  L_ANDAT = LT_COMP_ALL-ANDAT.
+  L_AEDAT = LT_COMP_ALL-AEDAT.
+  L_WERKS = LT_COMP_ALL-WERKS.
+  L_DATUV = LT_COMP_ALL-DATUV.
+
+  LOOP AT LT_COMP_ALL.
+    IF L_IDNRK = LT_COMP_ALL-IDNRK AND
+       L_STLAN = LT_COMP_ALL-STLAN AND
+       L_STLAL = LT_COMP_ALL-STLAL.
+      CONTINUE.
+    ELSE.
+      LT_MATERIAL_REDUCED-MATNR = L_IDNRK.
+      LT_MATERIAL_REDUCED-STLAN = L_STLAN.
+      LT_MATERIAL_REDUCED-STLAL = L_STLAL.
+      LT_MATERIAL_REDUCED-MTART = L_MTART.
+      LT_MATERIAL_REDUCED-ANDAT = L_ANDAT.
+      LT_MATERIAL_REDUCED-AEDAT = L_AEDAT.
+      LT_MATERIAL_REDUCED-WERKS = L_WERKS.
+      LT_MATERIAL_REDUCED-DATUV = L_DATUV.
+
+      APPEND LT_MATERIAL_REDUCED.
+      L_IDNRK = LT_COMP_ALL-IDNRK.
+      L_STLAN = LT_COMP_ALL-STLAN.
+      L_STLAL = LT_COMP_ALL-STLAL.
+      L_MTART = LT_COMP_ALL-MTART.
+      L_ANDAT = LT_COMP_ALL-ANDAT.
+      L_AEDAT = LT_COMP_ALL-AEDAT.
+      L_WERKS = LT_COMP_ALL-WERKS.
+      L_DATUV = LT_COMP_ALL-DATUV.
+
+    ENDIF.
+  ENDLOOP.
+  FREE LT_COMP_ALL.
+  LT_MATERIAL_REDUCED-MATNR = L_IDNRK.
+  LT_MATERIAL_REDUCED-STLAN = L_STLAN.
+  LT_MATERIAL_REDUCED-STLAL = L_STLAL.
+  LT_MATERIAL_REDUCED-MTART = L_MTART.
+  LT_MATERIAL_REDUCED-ANDAT = L_ANDAT.
+  LT_MATERIAL_REDUCED-AEDAT = L_AEDAT.
+  LT_MATERIAL_REDUCED-WERKS = L_WERKS.
+  LT_MATERIAL_REDUCED-DATUV = L_DATUV.
+
+  APPEND LT_MATERIAL_REDUCED.
+*CHECK THE TYPE OF THE EXPLODED COMPONENT.
+*IF THE COMPONET TYPE IS NOT HALB, DELETE IT
+*IF IT'S HALB, KEEP IT AND EXPLODE THE NEXT LEVEL.
+  FREE LT_MATERIAL.
+  LT_MATERIAL[] = LT_MATERIAL_REDUCED[].
+  LOOP AT LT_MATERIAL_REDUCED.
+    IF LT_MATERIAL_REDUCED-MTART <> 'HALB'.
+*DELETE THIS RECORD.
+      DELETE TABLE LT_MATERIAL FROM LT_MATERIAL_REDUCED.
+    ENDIF.
+  ENDLOOP.
+
+  IT_MATERIAL[] = LT_MATERIAL[].
+
+
+*NOW ALL THE HALB COMPONENTS OF NEXT LEVEL IS IN INTERNAL
+*TABLE IT_MATERIAL. SO WE RECURSIVELY THE ABOVE PROCESS BY
+*CALLING THIS ROUTINE ITSELF. BEFORE THAT WE NEED TO CHECK
+*IF WE STILL HAVE HALB COMPONENT TO PROCESS, IF NOT, THIS
+*PROCESS SHOULD END.
+  CLEAR LT_MATERIAL.
+  CLEAR LT_COMP_SINGLE.
+  CLEAR LT_MATERIAL_REDUCED.
+  FREE LT_MATERIAL.
+  FREE LT_COMP_SINGLE.
+  FREE LT_MATERIAL_REDUCED.
+
+  DESCRIBE TABLE IT_MATERIAL[] LINES L_COUNT.
+  IF L_COUNT = 0.
+    EXIT.
+  ENDIF.
+*CHECK HOW MANY LEVELS HAVE BEEN EXPLODED.
+*IF TOO MANY LEVELS, SOMETHING WRONG, STOP IT.
+  IF L_COUNTER >= 10.
+    MESSAGE I000 WITH TEXT-013.
+    EXIT.
+  ENDIF.
+  PERFORM CHECK_BOM_CHILD.
+
+ENDFORM.                    " CHECK_BOM_CHILD
+*&---------------------------------------------------------------------*
+*&      Form  BOM_EXPLODE_SINGLE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_MATNR  "MATERIAL NUMBER
+*      -->P_STLAN  "BOM USAGE
+*      -->P_STLAL  "ALTERNATIVE BOM
+*      -->P_WERKS  "PLANT
+*      <--P_COMP_SINGLE  "EXPLODED COMPONENTS LIST
+*      <--P_STATUS "STATUS
+*----------------------------------------------------------------------*
+FORM BOM_EXPLODE_SINGLE TABLES   P_COMP_SINGLE STRUCTURE STPOX
+                        USING    P_MATNR LIKE MAST-MATNR
+                                 P_STLAN LIKE MAST-STLAN
+                                 P_STLAL LIKE MAST-STLAL
+                                 P_WERKS LIKE MAST-WERKS
+                        CHANGING P_STATUS TYPE I.
+*********
+  DATA:   LT_STB TYPE  STPOX OCCURS 0 WITH HEADER LINE,
+          LT_MATCAT TYPE  CSCMAT OCCURS 0 WITH HEADER LINE,
+          LT_TOPMAT LIKE  CSTMAT,
+          L_CUOBJ   LIKE  MARC-CUOBJ,
+          L_STLNR   LIKE  MAST-STLNR,
+          LT_DSTST  LIKE  CSDATA-XFELD.
+
+  I_TOTAL_EXPL = I_TOTAL_EXPL + 1.
+
+  CALL FUNCTION 'CS_BOM_EXPL_MAT_V2'
+       EXPORTING
+            AUMNG  = 0
+            CAPID  = P_CAPID
+*            CUOBJ  = L_CUOBJ
+            CUOVS  = '0'
+            DATUV  = P_DATUV
+            EMENG  = P_EMENG
+            MKTLS  = 'X'
+*            MEHRS  = 'X'
+            MTNRV  = P_MATNR
+            STPST  = 0
+            STLAN  = P_STLAN
+            STLAL  = P_STLAL
+            SVWVO  = 'X'
+            WERKS  = P_WERKS
+            VRSVO  = 'X'
+* IMPORTING
+*   TOPMAT                      = LT_TOPMAT
+*   DSTST                       = LT_DSTST
+ TABLES
+            STB    = LT_STB
+            MATCAT = SELPOOL
+ EXCEPTIONS
+   ALT_NOT_FOUND               = 1
+   CALL_INVALID                = 2
+   MATERIAL_NOT_FOUND          = 3
+   MISSING_AUTHORIZATION       = 4
+   NO_BOM_FOUND                = 5
+   NO_PLANT_DATA               = 6
+   NO_SUITABLE_BOM_FOUND       = 7
+   CONVERSION_ERROR            = 8
+   OTHERS                      = 9
+          .
+  IF SY-SUBRC <> 0.
+    CASE SY-SUBRC.
+      WHEN 1 OR 3 OR 5 OR 7.
+        P_STATUS = 1 .  "NO BOM FIND
+      WHEN OTHERS.
+        P_STATUS = 2.  "BOM EXPLOSION OTHER ERRORS
+    ENDCASE.
+
+
+*    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+
+  ENDIF.
+* TRANSFER THE RESULT
+  P_COMP_SINGLE[] = LT_STB[].
+  FREE LT_STB.
+
+*********
+ENDFORM.                    " BOM_EXPLODE_SINGLE
+*&---------------------------------------------------------------------*
+*&      Form  WRITE_RESULT
+*&---------------------------------------------------------------------*
+*       WRITE THE CHECKING RESULT ON SCREEN
+*----------------------------------------------------------------------*
+*  -->  p1        INPUT THE CHECKING RESULT TABLE IT_RSULT
+*  <--  p2        DISPLAY ON SCREEN
+*----------------------------------------------------------------------*
+FORM WRITE_RESULT.
+  DATA: I_LINE_GROUP TYPE I.
+  DATA: I_SKIP TYPE I.
+
+*    WRITE: / 'TOTAL INPUT: ', I_TOTAL_INPUT,
+*          ' TOTAL BOM EXPLOSION TIMES: ', I_TOTAL_EXPL.
+*    WRITE : / 'Running Time: from :' ,L_BEGIN, ' TO ', L_END.
+  WRITE:/ SY-ULINE.
+  WRITE: / 'The Following Material Have no Child Components:'.
+  WRITE SY-ULINE.
+
+*CHECH STATUS
+  IF WA_CHK IS INITIAL OR WA_CHK EQ 'Y'.
+    DESCRIBE TABLE IT_RESULT LINES I_LINES.
+
+    IF I_LINES > 0.
+      WRITE: /0(18) TEXT-021, 29(8) TEXT-016, 37(10) TEXT-017,
+             48(10) TEXT-018, 59(18) TEXT-014,79(6) TEXT-015,
+             87(12) TEXT-022, 100(16) TEXT-023.
+      WRITE: / SY-ULINE.
+
+*     INITIALIZE THE COUNTER
+      I_LINE_GROUP = 1.
+      I_LINES = 0.
+
+      LOOP AT IT_BOM_PARENTS.
+        I_LINES = I_LINES + 1.
+        WRITE: /0(18) IT_BOM_PARENTS-MATNR,29(8) IT_BOM_PARENTS-WERKS ,
+               40(7) IT_BOM_PARENTS-STLAN,51(7) IT_BOM_PARENTS-VWALT,
+               59(18) IT_BOM_PARENTS-IDNRK,79(6) IT_BOM_PARENTS-MTART,
+               87(12) IT_BOM_PARENTS-DATUV,100(16) IT_BOM_PARENTS-AENNR.
+
+        I_SKIP = 5 * I_LINE_GROUP.
+        IF I_LINES EQ I_SKIP.
+          SKIP 1.
+          I_LINE_GROUP = I_LINE_GROUP + 1.
+        ENDIF.
+
+      ENDLOOP.
+    ELSE.
+      WRITE: / TEXT-019.
+    ENDIF.
+  ELSEIF WA_CHK = 'N'.
+    WRITE: / TEXT-009.
+  ELSEIF WA_CHK = 'X'.
+    WRITE: / TEXT-008.
+  ENDIF.
+
+ENDFORM.                    " WRITE_RESULT
+*&---------------------------------------------------------------------*
+*&      Form  CLEAR_VARIABLES
+*&---------------------------------------------------------------------*
+*       CLEAR THE GLOBAL DATA
+*----------------------------------------------------------------------*
+*  -->  p1
+*  <--  p2
+*----------------------------------------------------------------------*
+FORM CLEAR_VARIABLES.
+  CLEAR WA_CHK.
+  CLEAR L_COUNTER.
+  CLEAR I_LINES .
+  CLEAR L_BEGIN .
+  CLEAR L_END .
+  CLEAR I_TOTAL_EXPL .
+  CLEAR I_TOTAL_INPUT.
+  CLEAR L_BEGIN .
+  CLEAR L_END .
+
+
+ENDFORM.                    " CLEAR_VARIABLES
+*&---------------------------------------------------------------------*
+*&      Form  RESULT_CHECK
+*&---------------------------------------------------------------------*
+*       CHECK THE RESULT TABLE AND DELETE DUPLECATE ENTRY
+*----------------------------------------------------------------------*
+*  -->  p1        INPUT IT_RESULT
+*  <--  p2        OUTPUT IT_RESULT
+*----------------------------------------------------------------------*
+FORM RESULT_CHECK.
+  DATA: LT_RESULT LIKE IT_MATERIAL OCCURS 0 WITH HEADER LINE.
+  DATA: WA_RESULT LIKE LT_RESULT.
+  DATA: L_COUNT TYPE I.
+  DATA: L_TABIX LIKE SY-TABIX.
+  DATA: BEGIN OF LT_MAT OCCURS 0,
+          IDNRK LIKE STPO-IDNRK,
+          STLNR LIKE STPO-STLNR,
+          STLKN LIKE STPO-STLKN,
+        END OF LT_MAT.
+  DATA: BEGIN OF LT_MATDEL OCCURS 0,
+          IDNRK LIKE STPO-IDNRK,
+          STLAL LIKE STAS-STLAL,
+          STLNR LIKE STPO-STLNR,
+          STLKN LIKE STPO-STLKN,
+          LKENZ LIKE STAS-LKENZ,
+        END OF LT_MATDEL.
+  DATA: LT_MAT1 LIKE LT_MAT OCCURS 0 WITH HEADER LINE.
+  DESCRIBE TABLE IT_RESULT LINES L_COUNT.
+  IF L_COUNT <> 0.
+    SORT IT_RESULT BY MATNR WERKS STLAN STLAL.
+    DELETE ADJACENT DUPLICATES FROM IT_RESULT
+       COMPARING MATNR WERKS STLAN STLAL.
+*   CHECK THE REAULT IF SOME MATERIAL HAVE BEEN DELETED
+*   FIRST READ THE LIST FROM STPO
+    SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_MAT
+      FROM STPO
+       FOR ALL ENTRIES IN IT_RESULT
+       WHERE IDNRK = IT_RESULT-MATNR .
+    SORT LT_MAT BY STLNR STLKN.
+    DELETE ADJACENT DUPLICATES FROM LT_MAT
+    COMPARING STLNR STLKN.
+*READING DELETED ITEM FROM STAS
+
+
+    SELECT * INTO CORRESPONDING FIELDS OF TABLE LT_MATDEL
+            FROM STAS
+            FOR ALL ENTRIES IN LT_MAT
+              WHERE STLNR = LT_MAT-STLNR AND
+                    STLKN = LT_MAT-STLKN AND
+                    LKENZ = 'X'.
+*        CHECK IF ITEM IS DELETED
+    LT_MAT1[] = LT_MAT[].
+    LOOP AT LT_MAT.
+      L_TABIX = SY-TABIX.
+      READ TABLE LT_MATDEL WITH KEY STLNR = LT_MAT-STLNR
+                                    STLKN = LT_MAT-STLKN.
+      IF SY-SUBRC = 0.
+        DELETE LT_MAT INDEX L_TABIX.
+      ENDIF.
+    ENDLOOP.
+*      CHECK RESULT IF IT INCLUDES DELETED ITEM
+    LOOP AT IT_RESULT.
+      L_TABIX = SY-TABIX.
+      READ TABLE LT_MAT1 WITH KEY IDNRK = IT_RESULT-MATNR.
+      IF SY-SUBRC = 0.
+        READ TABLE LT_MAT WITH KEY IDNRK = IT_RESULT-MATNR.
+        IF SY-SUBRC <> 0.
+          DELETE IT_RESULT INDEX L_TABIX.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+************************************
+
+  ENDIF.
+ENDFORM.                    " RESULT_CHECK
+*&---------------------------------------------------------------------*
+*&      Form  WRITE_PROGRESS
+*&---------------------------------------------------------------------*
+*       DISPLAY THE PROGRAM PGROGRESS ON STATUS BAR
+*----------------------------------------------------------------------*
+*  -->  p1
+*  <--  p2
+*----------------------------------------------------------------------*
+FORM WRITE_PROGRESS.
+  CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+       EXPORTING
+            TEXT = TEXT-020.
+ENDFORM.                    " WRITE_PROGRESS
+
+
+*&---------------------------------------------------------------------*
+*&      Form  READ_PARENTS
+*&---------------------------------------------------------------------*
+FORM READ_PARENTS TABLES P_BOM_PARENTS STRUCTURE IT_BOM_PARENTS
+              USING P_IDNRK
+                    P_WERKS
+                    P_DATUV
+              CHANGING P_LAST.
+
+  DATA : C_ALT LIKE MAST-STLAL VALUE '01'.
+
+  DATA : IT_MC29S   LIKE MC29S   OCCURS 0 WITH HEADER LINE,
+       IT_STPOV   LIKE STPOV   OCCURS 0 WITH HEADER LINE,
+       IT_CSCEQUI LIKE CSCEQUI OCCURS 0 WITH HEADER LINE,
+       IT_CSCKND  LIKE CSCKND  OCCURS 0 WITH HEADER LINE,
+       IT_CSCMAT  LIKE CSCMAT  OCCURS 0 WITH HEADER LINE,
+       IT_CSCSTD  LIKE CSCSTD  OCCURS 0 WITH HEADER LINE,
+       IT_CSCTPL  LIKE CSCTPL  OCCURS 0 WITH HEADER LINE.
+* REFRESH: IMC29S, ISTPOV, ICSCEQUI, ICSCKND, ICSCMAT, ICSCSTD, ICSCTPL.
+* CLEAR : IMC29S, ISTPOV, ICSCEQUI, ICSCKND, ICSCMAT, ICSCSTD, ICSCTPL.
+
+  CALL FUNCTION 'CS_WHERE_USED_MAT'
+       EXPORTING
+            DATUB                      = P_DATUV
+            DATUV                      = P_DATUV
+            MATNR                      = P_IDNRK
+            WERKS                      = P_WERKS
+       IMPORTING
+            TOPMAT                     = IT_MC29S
+       TABLES
+            WULTB                      = IT_STPOV
+            EQUICAT                    = IT_CSCEQUI
+            KNDCAT                     = IT_CSCKND
+            MATCAT                     = IT_CSCMAT
+            STDCAT                     = IT_CSCSTD
+            TPLCAT                     = IT_CSCTPL
+       EXCEPTIONS
+            CALL_INVALID               = 1
+            MATERIAL_NOT_FOUND         = 2
+            NO_WHERE_USED_REC_FOUND    = 3
+            NO_WHERE_USED_REC_SELECTED = 4
+            NO_WHERE_USED_REC_VALID    = 5
+            OTHERS                     = 6.
+
+*  TEMP_ISTPOV[] = IT_STPOV[].
+  IF SY-SUBRC <> 0.
+    P_LAST = 'X'.
+    P_BOM_PARENTS-IDNRK = IT_RESULT-MATNR.
+    P_BOM_PARENTS-WERKS = IT_RESULT-WERKS.
+    P_BOM_PARENTS-STLAN = IT_RESULT-STLAN.
+    P_BOM_PARENTS-VWALT = IT_RESULT-STLAL.
+    APPEND P_BOM_PARENTS.
+    CLEAR IT_BOM_PARENTS.
+  ELSE.
+    LOOP AT IT_STPOV.
+      P_BOM_PARENTS-MATNR = IT_STPOV-MATNR.
+      P_BOM_PARENTS-WERKS = IT_STPOV-WERKS.
+      P_BOM_PARENTS-IDNRK = IT_RESULT-MATNR.
+      IF IT_STPOV-STLAN <> SPACE.
+        P_BOM_PARENTS-STLAN = IT_STPOV-STLAN.
+      ELSE.
+         P_BOM_PARENTS-STLAN = IT_RESULT-STLAN.
+      ENDIF.
+      IF IT_STPOV-VWALT <> SPACE.
+        P_BOM_PARENTS-VWALT = IT_STPOV-VWALT.
+      ELSE.
+        P_BOM_PARENTS-VWALT = C_ALT.  "DEFAULT
+      ENDIF.
+      P_BOM_PARENTS-MTART = IT_RESULT-MTART.
+      P_BOM_PARENTS-DATUV = IT_STPOV-DATUV.
+      P_BOM_PARENTS-AENNR = IT_STPOV-AENNR.
+      APPEND P_BOM_PARENTS.
+      CLEAR P_BOM_PARENTS.
+      CLEAR IT_STPOV.
+    ENDLOOP.
+  ENDIF.
+
+ENDFORM.                    " READ_PARANTS
+*&---------------------------------------------------------------------*
+*&      Form  GET_PARANTS
+*&---------------------------------------------------------------------*
+*       GET THE PARANTS OF THE RESULT MATERIALS THAT HAVE NO CHILD
+*----------------------------------------------------------------------*
+*  -->  IT_RESULT TABLE
+*  <--  IT_BOM_PARANTS
+*----------------------------------------------------------------------*
+FORM GET_PARENTS.
+  DATA:  L_NO_PARENT.
+  DATA:  I_LINES TYPE I.
+  DATA: BEGIN OF LT_USG_ALT OCCURS 0,
+          STLAN LIKE MAST-STLAN,
+          STLAL LIKE MAST-STLAL,
+        END OF LT_USG_ALT.
+  DESCRIBE TABLE IT_RESULT LINES I_LINES.
+  IF I_LINES <> 0.
+    LOOP AT IT_RESULT.
+
+      IF IT_RESULT-DATUV = SPACE.
+         P_DATUV = SY-DATUM.
+      ELSE.
+         P_DATUV = IT_RESULT-DATUV.
+      ENDIF.
+      PERFORM READ_PARENTS TABLES IT_BOM_PARENTS
+              USING IT_RESULT-MATNR
+                    IT_RESULT-WERKS
+                    P_DATUV
+              CHANGING L_NO_PARENT.
+
+    ENDLOOP.
+*   READ THE BOM USAGE AND ALTERNATIVE BOM FOR PARENTS
+*   DELETE DUPLICATE RECORD
+    SORT IT_BOM_PARENTS BY MATNR WERKS STLAN VWALT IDNRK.
+    DELETE ADJACENT DUPLICATES FROM IT_BOM_PARENTS
+       COMPARING MATNR WERKS STLAN VWALT IDNRK.
+  ENDIF.
+ENDFORM.                    " GET_PARENTS

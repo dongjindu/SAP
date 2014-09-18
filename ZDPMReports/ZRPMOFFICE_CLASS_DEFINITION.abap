@@ -1,0 +1,113 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZRPMOFFICE_CLASS_DEFINITION                                *
+*----------------------------------------------------------------------*
+
+TYPES: T_OI_RET_STRING TYPE SOI_RET_STRING,
+       T_OI_CUSTOM_PARAM TYPE SOI_CUSTOM_PARAM.
+TYPES: T_OI_MESSAGE_PARAM(50) TYPE C.
+TYPES: T_OI_PROXY_ERROR_CODE TYPE I.
+
+TYPES: T_OI_FIELDS_TABLE TYPE STANDARD TABLE OF RFC_FIELDS.
+TYPES: T_OI_PROPERTIES_TABLE TYPE STANDARD TABLE OF DPPROPS.
+
+CLASS CL_GUI_CFW DEFINITION LOAD.
+
+INTERFACE I_OI_DOCUMENT_FACTORY.
+    CONSTANTS:
+      DOCUMENT_FORMAT_COMPOUND(3) TYPE C VALUE 'OLE',
+      DOCUMENT_FORMAT_NATIVE(6)   TYPE C VALUE 'NATIVE',
+      DOCUMENT_FORMAT_RTF(3)      TYPE C VALUE 'RTF',
+      DOCUMENT_FORMAT_TEXT(4)     TYPE C VALUE 'TEXT'.
+
+    METHODS: START_FACTORY
+                 IMPORTING R3_APPLICATION_NAME TYPE C
+                           VALUE(REP_ID) TYPE SY-REPID DEFAULT SY-REPID
+                           VALUE(DYNPRO_NR) TYPE SY-DYNNR
+                                                       DEFAULT SY-DYNNR
+                           REGISTER_ON_CLOSE_EVENT TYPE C DEFAULT ' '
+                           REGISTER_ON_CUSTOM_EVENT TYPE C DEFAULT ' '
+                           VALUE(NO_FLUSH)   TYPE C DEFAULT ' '
+                 EXPORTING RETCODE           TYPE SOI_RET_STRING
+                           ERROR             TYPE REF TO I_OI_ERROR.
+
+    METHODS: STOP_FACTORY
+                 IMPORTING EXIT_CONTROL_MANAGER TYPE C DEFAULT ' '
+                           VALUE(NO_FLUSH)      TYPE C DEFAULT ' '
+                 EXPORTING RETCODE              TYPE SOI_RET_STRING
+                           ERROR                TYPE REF TO I_OI_ERROR.
+
+    METHODS: LINK_FACTORY
+                 IMPORTING VALUE(REP_ID)    TYPE SY-REPID
+                           VALUE(DYNPRO_NR) TYPE SY-DYNNR
+                           VALUE(NO_FLUSH)  TYPE C DEFAULT ' '
+                 EXPORTING RETCODE          TYPE SOI_RET_STRING
+                           ERROR            TYPE REF TO I_OI_ERROR.
+
+    METHODS: GET_DOCUMENT_PROXY
+                IMPORTING DOCUMENT_TYPE   TYPE C
+                          DOCUMENT_FORMAT TYPE C DEFAULT 'NATIVE'
+                          REGISTER_CONTAINER TYPE C DEFAULT ' '
+                          VALUE(NO_FLUSH) TYPE C DEFAULT ' '
+                EXPORTING DOCUMENT_PROXY TYPE REF TO I_OI_DOCUMENT_PROXY
+                          RETCODE        TYPE SOI_RET_STRING
+                          ERROR          TYPE REF TO I_OI_ERROR.
+
+    METHODS: GET_LINK_SERVER
+                IMPORTING SERVER_TYPE TYPE C DEFAULT ' '
+                          VALUE(NO_FLUSH) TYPE C DEFAULT ' '
+                EXPORTING LINK_SERVER TYPE REF TO I_OI_LINK_SERVER
+                          RETCODE     TYPE SOI_RET_STRING
+                          ERROR       TYPE REF TO I_OI_ERROR.
+
+    METHODS: GET_TABLE_COLLECTION
+                IMPORTING VALUE(NO_FLUSH)  TYPE C DEFAULT ' '
+                EXPORTING TABLE_COLLECTION TYPE
+                                            REF TO I_OI_TABLE_COLLECTION
+                          RETCODE          TYPE SOI_RET_STRING
+                          ERROR            TYPE REF TO I_OI_ERROR.
+
+    METHODS: GET_REGISTERED_DOC_TYPES
+                IMPORTING INTERFACE_TYPE  TYPE C DEFAULT ' '
+                          VALUE(NO_FLUSH) TYPE C DEFAULT ' '
+                EXPORTING DESCR_LIST TYPE SOI_DOCUMENT_TYPE_DESCR_LIST
+                          RETCODE    TYPE SOI_RET_STRING
+                          ERROR      TYPE REF TO I_OI_ERROR.
+
+    METHODS: CHECK_REGISTERED_DOC_TYPES
+                IMPORTING VALUE(NO_FLUSH)  TYPE C DEFAULT ' '
+                EXPORTING ERROR      TYPE REF TO I_OI_ERROR
+                CHANGING  DESCR_LIST TYPE SOI_DOCUMENT_TYPE_DESCR_LIST
+                          RETCODE    TYPE SOI_RET_STRING.
+ENDINTERFACE.
+
+*----------------------------------------------------------------------*
+
+CLASS C_OI_OLE_CONTROL_CREATOR DEFINITION.
+  PUBLIC SECTION.
+    CLASS-METHODS: GET_OLE_CONTAINER_CONTROL
+               EXPORTING CONTROL TYPE REF TO I_OI_OLE_CONTAINER_CONTROL
+                         RETCODE TYPE SOI_RET_STRING
+                         ERROR   TYPE REF TO I_OI_ERROR.
+ENDCLASS.
+
+CLASS C_OI_FACTORY_CREATOR DEFINITION.
+  PUBLIC SECTION.
+    CONSTANTS:
+      FACTORY_TYPE_OLE(3)      TYPE C VALUE 'OLE',
+      FACTORY_TYPE_PORTABLE(8) TYPE C VALUE 'PORTABLE'.
+
+    CLASS-METHODS: GET_DOCUMENT_FACTORY
+                 IMPORTING FACTORY_TYPE TYPE C DEFAULT 'PORTABLE'
+                 EXPORTING FACTORY TYPE REF TO I_OI_DOCUMENT_FACTORY
+                           RETCODE TYPE SOI_RET_STRING
+                           ERROR   TYPE REF TO I_OI_ERROR.
+ENDCLASS.
+
+CLASS C_OI_OLE_DOCUMENT_FACTORY DEFINITION.
+  PUBLIC SECTION.
+    INTERFACES: I_OI_DOCUMENT_FACTORY.
+
+  PRIVATE SECTION.
+    DATA: CONTAINER_CONTROL TYPE REF TO I_OI_OLE_CONTAINER_CONTROL.
+    DATA: CONTAINER TYPE REF TO CL_GUI_CUSTOM_CONTAINER.
+ENDCLASS.

@@ -1,0 +1,87 @@
+FUNCTION ZTR_PRINT_ACTUAL.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(HIER) TYPE  CFHID2
+*"     VALUE(SKALV) TYPE  TS70SKAL_VOR DEFAULT '0'
+*"     VALUE(DECIM) TYPE  TS70SKAL_NACH DEFAULT '0'
+*"     VALUE(P_DATE) TYPE  SY-DATUM OPTIONAL
+*"  TABLES
+*"      TITLE
+*"      ACT STRUCTURE  FDSR
+*"----------------------------------------------------------------------
+
+  DATA : LINE_SIZE TYPE I,
+         COL_WID   TYPE I.
+
+  COL_WID = 30.
+  LINE_SIZE = ( COL_WID + 1 ) + 83.
+  LEAVE TO LIST-PROCESSING.
+
+  SET PF-STATUS 'MAIN'.
+
+  IF LINE_SIZE <= 122.
+    CALL FUNCTION 'SET_PRINT_PARAMETERS'
+      EXPORTING
+        DESTINATION = 'LOCL'
+        LAYOUT      = 'ZP_140_120'.
+  ELSEIF LINE_SIZE <= 150.
+    CALL FUNCTION 'SET_PRINT_PARAMETERS'
+      EXPORTING
+        DESTINATION = 'LOCL'
+        LAYOUT      = 'ZP_140_150'.
+  ELSEIF LINE_SIZE <= 300.
+    CALL FUNCTION 'SET_PRINT_PARAMETERS'
+      EXPORTING
+        DESTINATION = 'LOCL'
+        LAYOUT      = 'ZL_140_300'.
+  ELSEIF LINE_SIZE <= 550.
+    CALL FUNCTION 'SET_PRINT_PARAMETERS'
+      EXPORTING
+        DESTINATION = 'LOCL'
+        LAYOUT      = 'ZL_140_550'.
+  ELSE.
+    CALL FUNCTION 'SET_PRINT_PARAMETERS'
+      EXPORTING
+        DESTINATION = 'LOCL'
+        LAYOUT      = 'ZL_150_700'.
+  ENDIF.
+
+
+  NEW-PAGE NO-HEADING NO-TITLE LINE-SIZE LINE_SIZE
+                               LINE-COUNT 100.
+
+  PERFORM WRITE_TITLE TABLES TITLE
+                       USING LINE_SIZE COL_WID SKALV P_DATE 'X'.
+
+
+  CLEAR   : V_TKCHH , LT_HIER_DB, LT_HIER_TB.
+  REFRESH : LT_HIER_DB, LT_HIER_TB.
+
+  SELECT SINGLE * FROM V_TKCHH WHERE ID1 = 'SKPSK'
+                                 AND ID2 = HIER.
+
+  CALL FUNCTION 'RKC_GET_HIERARCHY_WITH_TEXT'
+    EXPORTING
+      APPLCLASS         = 'TRM'
+      I_HIERARCHY       = V_TKCHH
+    IMPORTING
+      O_HIERARCHY       = V_TKCHH
+    TABLES
+      HIERARCHY_POINTER = LT_HIER_DB
+      HIERARCHY_TABLE   = LT_HIER_TB
+    EXCEPTIONS
+      BAD_HIERARCHY     = 01
+      BAD_KEYID         = 02
+      DB_ERROR          = 03.
+
+  WRITE :/(LINE_SIZE) SY-ULINE.
+  NEW-LINE.
+  PERFORM WRITE_ACTUAL TABLES  ACT
+                        USING  LINE_SIZE
+                               COL_WID
+                               SKALV
+                               DECIM.
+  WRITE :/(LINE_SIZE) SY-ULINE.
+
+ENDFUNCTION.

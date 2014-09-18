@@ -1,0 +1,9 @@
+
+DATA: UPD_ICDTXT_ZTIMIMG08       TYPE C.
+DATA: BEGIN OF ICDTXT_ZTIMIMG08       OCCURS 20.
+        INCLUDE STRUCTURE CDTXT.
+DATA: END OF ICDTXT_ZTIMIMG08      .
+
+TABLES: *ZTIMIMG08                     , ZTIMIMG08                     .
+DATA: UPD_ZTIMIMG08                      TYPE C.
+

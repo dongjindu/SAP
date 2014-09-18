@@ -1,0 +1,77 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZXTRKU03                                                   *
+*----------------------------------------------------------------------*
+
+*DATA: IT_EDIDD TYPE EDID4 OCCURS 0 WITH HEADER LINE,
+DATA: IT_EDIDD TYPE EDIDD OCCURS 0 WITH HEADER LINE,
+       WA_E1EDT13 LIKE E1EDT13,
+       WA_E1EDL11 LIKE E1EDL11,
+       L_DATUM LIKE SY-DATUM.
+
+DATA: BEGIN OF LT_ENG OCCURS 0,
+      EQUNR LIKE EQUI-EQUNR,
+      END OF LT_ENG.
+
+DATA: WA_AUSP LIKE AUSP.
+DATA: LT_VMASTER  LIKE TABLE OF ZSPP_VIN_VALUE WITH HEADER LINE.
+
+CALL FUNCTION 'IDOC_READ_COMPLETELY'
+     EXPORTING
+          DOCUMENT_NUMBER         = IDOC_CONTROL-DOCNUM
+     TABLES
+          INT_EDIDD               = IT_EDIDD
+     EXCEPTIONS
+          DOCUMENT_NOT_EXIST      = 1
+          DOCUMENT_NUMBER_INVALID = 2
+          OTHERS                  = 3.
+
+DELIVERY_HEAD-WABUC = 'X'.
+DELIVERY_HEAD-KZPOD = ' '.
+
+LOOP AT IT_EDIDD.
+  CASE IT_EDIDD-SEGNAM.
+    WHEN 'E1EDT13'.
+      WA_E1EDT13 =  IT_EDIDD-SDATA.
+      IF WA_E1EDT13-ISDD > '00000000'.
+        L_DATUM = WA_E1EDT13-ISDD.
+        DELIVERY_HEAD-WADAT_IST = L_DATUM.
+        EXIT.
+      ENDIF.
+  ENDCASE.
+ENDLOOP.
+
+LOOP AT IT_EDIDD.
+  CASE IT_EDIDD-SEGNAM.
+    WHEN 'E1EDL11'.
+      WA_E1EDL11 =  IT_EDIDD-SDATA.
+      IF NOT WA_E1EDL11-SERNR IS INITIAL.
+        LT_ENG-EQUNR = WA_E1EDL11-SERNR.
+        APPEND LT_ENG.
+      ENDIF.
+  ENDCASE.
+ENDLOOP.
+
+IF NOT L_DATUM IS INITIAL.
+  IF LT_ENG[] IS INITIAL.
+  ELSE.
+    LOOP AT LT_ENG.
+      CLEAR : LT_VMASTER,  LT_VMASTER[] .
+      LT_VMASTER-ATNAM = 'EN_GI_DATE'.
+      LT_VMASTER-ATWRT = L_DATUM.
+      APPEND LT_VMASTER.
+
+      CALL FUNCTION 'Z_FPP_HANDLING_MASTER'
+           EXPORTING
+                OBJECT     = LT_ENG-EQUNR
+                MODE       = 'W'
+                CTYPE      = '002'
+           TABLES
+                VAL_TABLE  = LT_VMASTER
+           EXCEPTIONS
+                NO_DATA    = 1
+                ERROR_MODE = 2
+                OTHERS     = 3.
+    ENDLOOP.
+    COMMIT WORK.
+  ENDIF.
+ENDIF.
