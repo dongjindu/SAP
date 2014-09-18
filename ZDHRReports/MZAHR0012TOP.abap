@@ -1,0 +1,104 @@
+*&---------------------------------------------------------------------*
+*& Include MZAHR0012TOP                                                *
+*&                                                                     *
+*&---------------------------------------------------------------------*
+
+PROGRAM  SAPMZAHR0012                  .
+
+TABLES: PA0001,
+        PA0008,
+        HRP1000,
+        T500p,
+        CSKT,
+        ZTHR_PCPXX,
+        ZTHR_PCP00,
+        ZTHR_PCP01,
+        ZTHR_PCP02,
+        ZTHR_PCP05.
+
+*... internal tables
+DATA: BEGIN OF IT_9000 OCCURS 0,
+      ZCOST    LIKE ZTHR_PCP00-ZCOST,  " Cost Center
+      ZOBJC    LIKE ZTHR_PCP00-ZOBJC,  " Job
+      ZPERG    LIKE ZTHR_PCP00-ZPERG,  " Employee Group
+      ZSUBG    LIKE ZTHR_PCP00-ZSUBG,  " Employee Subgroup
+      ZSENR    LIKE ZTHR_PCP00-ZSENR,  " Seniority
+      ZHEDC    LIKE ZTHR_PCP00-ZHEDC,  " Head Count
+      ZVAL1    LIKE ZTHR_PCP02-ZVAL1,  " Pay Rate
+      ZVAL2    LIKE ZTHR_PCP02-ZVAL2,
+      AMUNT    LIKE ZTHR_PCP00-ACT03,
+      CALAM    LIKE ZTHR_PCP00-ZSALY,
+      ANCUR    LIKE ZTHR_PCP00-ANCUR,
+      KTEXT    LIKE CSKT-KTEXT,
+      ZJOBK    LIKE ZTHR_PCP03-ZJOBK,
+      xx       type i,
+     END OF IT_9000.
+
+DATA: BEGIN OF IT_MAINT OCCURS 0,
+      CHKBX,
+      FORMS(10),
+      ZSEQN    LIKE ZTHR_PCP05-ZSEQN,
+      ZOBJC    LIKE ZTHR_PCP00-ZOBJC,
+      ZOBJT    LIKE ZTHR_AHC01-ZJOBK,
+      ZHEDT    LIKE ZTHR_PCP00-ZHEDC,
+      ZSENR    LIKE ZTHR_PCP00-ZSENR,
+      ZHEDC    LIKE ZTHR_PCP00-ZHEDC,
+      HOURS    LIKE ZTHR_PCP00-ZSALY,
+      ZWKTM    LIKE ZTHR_PCP05-ZWKTM,
+      ZVAL1    LIKE ZTHR_PCP02-ZVAL1,
+      AMUNT    LIKE ZTHR_PCP00-ZSALY,
+      ANCUR    LIKE ZTHR_PCP00-ANCUR.
+DATA: END OF IT_MAINT.
+
+DATA: IT_COPYT LIKE IT_MAINT OCCURS 0 WITH HEADER LINE.
+
+DATA: BEGIN OF IT_PCPXX OCCURS 0.
+        INCLUDE STRUCTURE ZTHR_PCPXX.
+DATA: HOURY    LIKE ZTHR_PCP00-ZSALY,
+      END OF IT_PCPXX.
+
+DATA: BEGIN OF IT_YEARS OCCURS 1,
+      ZYEAR    LIKE ZTHR_PCP03-ZYEAR.
+DATA: END OF IT_YEARS.
+
+DATA: BEGIN OF IT_VERSN OCCURS 1,
+      ZVERS    LIKE ZTHR_PCP03-ZVERS.
+DATA: END OF IT_VERSN.
+
+DATA: BEGIN OF IT_GROUP OCCURS 1,
+      ZGRUP    LIKE ZTHR_PCP01-ZGRUP,
+      ZGTXT    LIKE ZTHR_PCP01-ZGTXT.
+DATA: END OF IT_GROUP.
+
+DATA: BEGIN OF IT_KOSTL OCCURS 1,
+      ZKOST    LIKE CSKT-KOSTL,
+      ZKTXT    LIKE CSKT-KTEXT.
+DATA: END OF IT_KOSTL.
+
+DATA: BEGIN OF IT_PERSA OCCURS 1,
+      WERKS    LIKE T500P-PERSA,
+      NAME1    LIKE T500P-NAME1.
+DATA: END OF IT_PERSA.
+
+DATA: IT_FIELD     LIKE HELP_VALUE OCCURS 1 WITH HEADER LINE,
+      DYNPFIELDS   LIKE STANDARD TABLE OF DYNPREAD WITH HEADER LINE.
+
+CONTROLS: TC_9000 TYPE TABLEVIEW USING SCREEN 9000.
+
+RANGES: R_ZJOBC FOR ZTHR_AHC01-ZJOBC.
+
+*... variants
+DATA: W_KOSTL      LIKE PA0001-KOSTL,      " parameter ; cost center
+      W_KTEXT      LIKE RPCYERKX-KTEXT,    " parameter ; cost name
+      W_ZYEAR      LIKE ZTHR_AHC01-ZYEAR,  " parameter ; year
+      W_ZMONS      LIKE ZTHR_AHC01-ZMONS,  " parameter ; month
+      W_ZVERS      LIKE ZTHR_AHC01-ZVERS,  " parameter ; version
+      W_ZGRUP      LIKE ZTHR_PCP01-ZGRUP,  " parameter ; work type
+      W_ZGTXT      LIKE ZTHR_PCP01-ZGTXT,  " parameter ; work type name
+      W_WERKS      LIKE PA0001-WERKS,
+      W_NAME1      LIKE T500P-NAME1.
+
+
+DATA: W_FNAME      LIKE  HELP_INFO-FIELDNAME,
+      W_TABIX      LIKE  SY-TABIX,
+      W_FLDVL      LIKE  HELP_INFO-FLDVALUE.
