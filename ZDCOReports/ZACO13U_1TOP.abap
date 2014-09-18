@@ -1,0 +1,69 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZACO13R_1TOP                                               *
+*----------------------------------------------------------------------*
+*----------------------------------------------------------------------*
+*   Data Definition
+*----------------------------------------------------------------------*
+** type-pools
+TYPE-POOLS: SLIS.
+
+** Table
+TABLES : ZTCO_SHOPCOST_AT, ZTCO_SHOPCOST, ZTCO_SHOPVAR,
+         ZSCO_SHOPVAR_KEY.
+TABLES : TKA01, CKMLHD, T006.
+TABLES : ZSCA_TIME_STAMP.
+
+** Internal table
+DATA : BEGIN OF IT_DATACON OCCURS 0.
+        INCLUDE STRUCTURE ZTCO_SHOPVAR.
+* From STD "S"
+DATA :  WERTN   LIKE ZTCO_SHOPCOST-WERTN.
+* From STD "A"
+DATA :  WKGBTR         LIKE ZTCO_SHOPCOST_AT-WKGBTR,
+        MBGBTR         LIKE ZTCO_SHOPCOST_AT-MBGBTR,
+        ADD_WKGBTR     LIKE ZTCO_SHOPCOST_AT-ADD_WKGBTR,
+        ADD_MBGBTR     LIKE ZTCO_SHOPCOST_AT-ADD_MBGBTR,
+*        WIP_AMT        LIKE ZTCO_SHOPCOST_AT-WIP_AMT,
+*        WIP_QUANTITY   LIKE ZTCO_SHOPCOST_AT-WIP_QUANTITY,
+*        SCRAP_AMT      LIKE ZTCO_SHOPCOST_AT-SCRAP_AMT,
+*        ACTUAL_SCRAP   LIKE ZTCO_SHOPCOST_AT-ACTUAL_SCRAP,
+        ML_ACT_PREIS   LIKE ZTCO_SHOPCOST_AT-ML_ACT_PREIS.
+DATA :  PR_WIP_AMT        LIKE ZTCO_SHOPCOST_AT-WIP_AMT,
+        PR_WIP_QUANTITY   LIKE ZTCO_SHOPCOST_AT-WIP_QUANTITY.
+
+DATA : END OF   IT_DATACON.
+* Main ITAB
+DATA : BEGIN OF IT_ZTCO_SHOPVAR OCCURS 0.
+        INCLUDE STRUCTURE IT_DATACON.
+DATA : END OF   IT_ZTCO_SHOPVAR.
+* For Material Ledger
+DATA : BEGIN OF IT_MLCD_EX OCCURS 0.
+*        INCLUDE STRUCTURE MLCD.
+DATA :  KALNR LIKE MLCD-KALNR,
+        BDATJ LIKE MLCD-BDATJ,
+        POPER LIKE MLCD-POPER,
+        LBKUM LIKE MLCD-LBKUM,
+        MEINS LIKE MLCD-MEINS.
+DATA :  MATNR LIKE MBEW-MATNR,
+        BWKEY LIKE MBEW-BWKEY,
+        BWTAR LIKE MBEW-BWTAR.
+DATA : END OF  IT_MLCD_EX.
+
+*DATA : BEGIN OF IT_ZTCO_SHOPCOST OCCURS 0.
+*        INCLUDE STRUCTURE ZTCO_SHOPCOST.
+*DATA : END OF   IT_ZTCO_SHOPCOST.
+*DATA : BEGIN OF IT_ZTCO_SHOPCOST_AT OCCURS 0.
+*        INCLUDE STRUCTURE ZTCO_SHOPCOST_AT.
+*DATA : END OF   IT_ZTCO_SHOPCOST_AT.
+*
+
+*----------------------------------------------------------------------*
+*   Selection Condition                                                *
+*----------------------------------------------------------------------*
+SELECTION-SCREEN BEGIN OF BLOCK BL1 WITH FRAME TITLE TEXT-001.
+* General Info.
+PARAMETERS :     P_KOKRS LIKE CSKS-KOKRS   MEMORY ID CAC  OBLIGATORY.
+PARAMETERS :     P_BDATJ LIKE ZTCO_SHOPCOST-BDATJ OBLIGATORY.
+PARAMETERS :     P_POPER LIKE ZTCO_SHOPCOST-POPER OBLIGATORY.
+
+SELECTION-SCREEN END OF BLOCK BL1.

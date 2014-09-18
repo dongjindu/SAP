@@ -1,0 +1,375 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZACO11R_ML03_NEW_TOP                                       *
+*----------------------------------------------------------------------*
+*----------------------------------------------------------------------*
+*   Macro
+*----------------------------------------------------------------------*
+* To set Values from MLCD containers
+DEFINE MLDR_SET_VAL_PROCCAT.
+  IT_MLIT-&1_&2_LBKUM = &3-LBKUM.
+  IT_MLIT-&1_&2_SALK3 = &3-SALK3.
+  IT_MLIT-&1_&2_RD    =
+                            &3-ESTPRD
+                          + &3-ESTKDM
+                          + &3-MSTPRD
+                          + &3-MSTKDM
+                          + &3-TPPRD.
+END-OF-DEFINITION.
+
+* By MVT GRP
+DEFINE MLDR_SET_VAL_MVTGRP.
+  IT_MLIT-&1_&2_LBKUM = &3-LBKUM * ( -1 ).
+  IT_MLIT-&1_&2_SALK3 = &3-SALK3 * ( -1 ).
+END-OF-DEFINITION .
+
+* By Andy
+DEFINE MLDR_SET_VAL_MVTGRP_R.
+  IT_MLIT-&1_&2_LBKUM = &3-LBKUM.
+  IT_MLIT-&1_&2_SALK3 = &3-SALK3.
+END-OF-DEFINITION .
+
+* For Cal. VKA
+DEFINE MLDR_CAL_VKA.
+  IT_MLIT-VN_VKA_&1
+   =  ( IT_MLIT-VN_VKA_&1 + IT_MLIT-VN_&2_&1 +
+     IT_MLIT-VN_&3_&1 )
+  - ( IT_MLIT-VN_&2_&1 + IT_MLIT-VN_&3_&1 ).
+END-OF-DEFINITION .
+
+
+* For Substraction from VN ETC
+DEFINE MLDR_SUB_VN_ETC.
+  IT_MLIT-VN_ETC_&1
+               = ( IT_MLIT-VN_ETC_&1
+               + IT_MLIT-VN_OR66_&1
+               + IT_MLIT-VN_OR58_&1
+               + IT_MLIT-VN_CC56_&1
+               + IT_MLIT-VN_CC60_&1
+               + IT_MLIT-VN_CC64_&1 )
+               -
+               (  IT_MLIT-VN_OR66_&1
+                + IT_MLIT-VN_OR58_&1
+                + IT_MLIT-VN_CC56_&1
+                + IT_MLIT-VN_CC60_&1
+                + IT_MLIT-VN_CC64_&1 ).
+END-OF-DEFINITION .
+
+*----------------------------------------------------------------------*
+*   Data Definition
+*----------------------------------------------------------------------*
+* Type-Pools
+TYPE-POOLS : CKMV0, SLIS, ZCOT1.
+
+* Tables
+TABLES: CKMLPP,
+        CKMLCR,
+        CKMLHD,
+        CKMLCT,
+        MACKU,
+        MARC,
+        MARA,
+        MLCD_KEY,
+        MLCD,
+        MLCR,
+        MLPP,
+        MLHD,
+        MLIT,
+        MBEW,
+        ZTCO_MLIT,
+        ZTCO_MLI2,
+        ZVCO_MLXXV.
+
+*  Internal Tables
+*  For MLCD
+DATA IT_KALNR TYPE CKMV0_MATOBJ_TBL WITH HEADER LINE.
+
+DATA: BEGIN OF IT_MLCD OCCURS 1000,
+        KALNR   LIKE MLCD-KALNR,
+        BDATJ   LIKE MLCD-BDATJ,
+        POPER   LIKE MLCD-POPER,
+        CATEG(7),
+        PTYP    LIKE MLCD-PTYP,
+        BVALT   LIKE MLCD-BVALT,
+        CURTP   LIKE MLCD-CURTP,
+        OBJECT  LIKE MARA-MATNR,
+        LBKUM   LIKE MLCD-LBKUM,
+        MEINS   LIKE MLCD-MEINS,
+        SALK3   LIKE MLCD-SALK3,
+        ESTPRD  LIKE MLCD-ESTPRD,
+        ESTKDM  LIKE MLCD-ESTKDM,
+        MSTPRD  LIKE MLCD-MSTPRD,
+        MSTKDM  LIKE MLCD-MSTKDM,
+        WAERS   LIKE MLCD-WAERS,
+        TPPRD   LIKE MLCD-TPPRD,
+      END OF   IT_MLCD.
+
+* For Display
+DATA: IT_MLIT  TYPE TABLE OF ZTCO_MLIT WITH HEADER LINE.
+
+* For ZVCO_MLXXV - Data by MVTGRP
+* MLHD
+* MLIT
+* MLPP
+* MLCR
+* MLPPF
+
+DATA: BEGIN OF IT_ZVCO_MLXXV OCCURS 1000,
+        BELNR       LIKE MLHD-BELNR,
+        KJAHR       LIKE MLHD-KJAHR,
+        AWREF       LIKE MLHD-AWREF,
+        AWORG       LIKE MLHD-AWORG,
+        URZEILE     LIKE MLIT-URZEILE,     " Line Item No.
+        POSNR       LIKE MLIT-POSNR,
+        MATNR       LIKE MLIT-MATNR,
+        BWKEY       LIKE MLIT-BWKEY,
+        KALNR       LIKE MLIT-KALNR,
+        MEINS       LIKE MLIT-MEINS,
+        BEWARTGRP   LIKE MLIT-BEWARTGRP,   " MvType Grp
+        KATEGORIE   LIKE MLIT-KATEGORIE,   " Category in ML
+        PTYP        LIKE MLIT-PTYP,        " Original process cat.
+*       PERART      TYPE CK_PER_ART,       " VM-previous,LF-current
+*        FELDG       LIKE MLPPF-FELDG,
+        LBKUM       LIKE MLPP-LBKUM,
+        SALK3       LIKE MLCR-SALK3,
+        chk(1)      type c,
+      END OF   IT_ZVCO_MLXXV.
+
+
+DATA: BEGIN OF IT_DETAIL OCCURS 0,
+        KJAHR       LIKE MLCR-KJAHR,
+        POPER       LIKE MLCR-POPER,
+        BELNR       LIKE MLCR-BELNR,
+        POSNR       LIKE MLCR-POSNR,
+        KALNR       LIKE MLIT-KALNR,
+        bwkey       LIKE mlit-bwkey,
+        MATNR       LIKE MLIT-MATNR,
+        BEWARTGRP   LIKE MLIT-BEWARTGRP,   " MvType Grp
+        AWREF       LIKE MLHD-AWREF,   " Doc. No.
+        AWORG       LIKE MLHD-AWORG,   " Year
+        URZEILE     LIKE MLIT-URZEILE, " Line Item No.
+        PTYP        LIKE MLIT-PTYP,    " Original process cat.
+        MJAHR       LIKE MSEG-MJAHR,   " Year for matching MSEG
+        ZEILE       LIKE MSEG-ZEILE,   " Line Item No. for matching MSEG
+      END OF IT_DETAIL.
+
+DATA: BEGIN OF IT_MSEG OCCURS 0,
+        MBLNR       LIKE MSEG-MBLNR,
+        MJAHR       LIKE MSEG-MJAHR,
+        ZEILE       LIKE MSEG-ZEILE,
+        SHKZG       LIKE mseg-SHKZG,
+        BWART       LIKE MSEG-BWART,
+        MATNR       LIKE MSEG-MATNR,
+        SAKTO       LIKE MSEG-SAKTO,
+        KOSTL       LIKE MSEG-KOSTL,
+        AUFNR       LIKE MSEG-AUFNR,
+        DMBTR       LIKE MSEG-DMBTR,
+        MENGE       LIKE MSEG-MENGE,
+        MEINS       LIKE MSEG-MEINS,
+      END OF IT_MSEG.
+
+* FOR Detail & clearing acc : Begin
+DATA: IT_ZTCO_MLI2 LIKE ZTCO_MLI2 OCCURS 0 WITH HEADER LINE,
+      IT_MLI2_TEMP LIKE ZTCO_MLI2 OCCURS 0 WITH HEADER LINE.
+
+DATA: BEGIN OF IT_CLEAR OCCURS 0,
+       AWKEY   LIKE BKPF-AWKEY,
+       MBLNR   LIKE MSEG-MBLNR,
+       BDATJ   LIKE MSEG-MJAHR.
+DATA: END OF   IT_CLEAR.
+
+DATA: BEGIN OF IT_BKPF OCCURS 0,
+       bukrs   LIKE BKPF-BUKRS,
+       GJAHR   LIKE BKPF-GJAHR,
+       AWKEY   LIKE BKPF-AWKEY,
+       BLART   LIKE BKPF-BLART,
+       BELNR   LIKE BKPF-BELNR.
+DATA: END OF   IT_BKPF.
+
+DATA: BEGIN OF IT_BSAS_TEMP OCCURS 0,
+        bukrs   LIKE BKPF-BUKRS,
+        GJAHR   LIKE BSAS-GJAHR,
+        BELNR   LIKE BSAS-BELNR,
+        AUGDT   LIKE BSAS-AUGDT,
+        AUGBL   LIKE BSAS-AUGBL,
+        BLART   LIKE BSAS-BLART.
+DATA: END OF    IT_BSAS_TEMP.
+
+DATA: BEGIN OF IT_BSAS OCCURS 0,
+        BUKRS   LIKE BSAS-BUKRS,
+        GJAHR   LIKE BSAS-GJAHR,
+        BELNR   LIKE BSAS-BELNR,
+        AUGDT   LIKE BSAS-AUGDT,
+        AUGBL   LIKE BSAS-AUGBL,
+        BSCHL   LIKE BSAS-BSCHL,
+        BLART   LIKE BSAS-BLART,
+        BUZEI   LIKE BSAS-BUZEI.
+DATA: END OF   IT_BSAS.
+
+DATA: BEGIN OF IT_BSEG OCCURS 0,
+       GJAHR   LIKE BSEG-GJAHR,
+       BELNR   LIKE BSEG-BELNR,
+       DMBTR   LIKE BSEG-DMBTR,
+       HKONT   LIKE BSEG-HKONT,
+       BUZEI   LIKE BSEG-BUZEI,
+       KOSTL   LIKE BSEG-KOSTL,
+       AUFNR   LIKE BSEG-AUFNR.
+DATA: END OF   IT_BSEG.
+
+* FOR Detail & clearing acc : End
+DATA : BEGIN OF IT_T001W OCCURS 0.
+        INCLUDE STRUCTURE T001W.
+DATA : END OF   IT_T001W.
+
+DATA P_POPER LIKE MLCD_KEY-POPER.
+
+* Find BADY BOY
+TYPES: BEGIN OF S_MATS,
+        KALNR    TYPE CKMLHD-KALNR,
+        BKLAS    TYPE MBEW-BKLAS,      " val class
+        MATNR    TYPE CKMLHD-MATNR,
+        BWKEY    TYPE CKMLHD-BWKEY,
+        BWTAR    TYPE CKMLHD-BWTAR,
+        MTART    TYPE MARA-MTART,
+        MATKL    TYPE MARA-MATKL,
+        MAKTG    TYPE MAKT-MAKTG,
+        STPRS    TYPE MBEW-STPRS,
+        VERPR    TYPE MBEW-VERPR,
+        SALK3    TYPE MBEW-SALK3,
+        MEINS    TYPE CKMLPP-MEINS,
+        STATUS   TYPE CK_MLSTAT,       "  ML status
+        ABKUMO   TYPE CK_ABKUM,        " Begin
+        UMKUMO   TYPE CKMLPP-UMKUMO,   " Prev Posting
+        ZUKUMO   TYPE CKMLPP-ZUKUMO,   " GR
+        VNKUMO   TYPE CKMLPP-VNKUMO,   " GI
+        LBKUM    TYPE CKMLPP-LBKUM ,   " End
+        EKKUMO   TYPE CKMLPP-EKKUMO,   " PO GR
+        PEINH    LIKE CKMLCR-PEINH,
+        ABSALK3  TYPE CKMLCR-ABSALK3,
+        ABPRD_O  TYPE CKMLCR-ABPRD_O,
+        ABKDM_O  TYPE CKMLCR-ABKDM_O,
+        ABPRD_MO TYPE CKMLCR-ABPRD_MO,
+        ABKDM_MO TYPE CKMLCR-ABKDM_MO,
+        VPPRD_O  TYPE CKMLCR-VPPRD_O,
+        ZUPRD_O  TYPE CKMLCR-ZUPRD_O,
+        ZUKDM_O  TYPE CKMLCR-ZUKDM_O,
+        VPKDM_O  TYPE CKMLCR-VPKDM_O,
+        ZUPRD_MO TYPE CKMLCR-ZUPRD_MO,
+        ZUKDM_MO TYPE CKMLCR-ZUKDM_MO,
+        VNPRD_EA TYPE CKMLCR-VNPRD_EA,
+        VNKDM_EA TYPE CKMLCR-VNKDM_EA,
+        EBPRD_EA TYPE CKMLCR-EBPRD_EA,
+        EBKDM_EA TYPE CKMLCR-EBKDM_EA,
+        VNPRD_MA TYPE CKMLCR-VNPRD_MA,
+        VNKDM_MA TYPE CKMLCR-VNKDM_MA,
+        EBPRD_MA TYPE CKMLCR-EBPRD_MA,
+        EBKDM_MA TYPE CKMLCR-EBKDM_MA,
+   END OF S_MATS.
+
+TYPES TY_MATS TYPE STANDARD TABLE OF S_MATS WITH KEY KALNR.
+
+TYPES: BEGIN OF S_NDI,
+         KALNR TYPE CKMLHD-KALNR,
+         BDATJ TYPE CKMLPP-BDATJ,
+         POPER TYPE CKMLPP-POPER,
+         UNTPER TYPE CKMLPP-UNTPER,
+         CURTP TYPE CKMLCR-CURTP,
+         MATNR TYPE CKMLHD-MATNR,
+         BWKEY TYPE CKMLHD-BWKEY,
+         BWTAR TYPE CKMLHD-BWTAR,
+         VBELN TYPE CKMLHD-VBELN,
+         POSNR TYPE CKMLHD-POSNR,
+         PSPNR TYPE CKMLHD-PSPNR,
+         POS_TYPE(3),                 "NDI, NIN
+         BKLAS TYPE MBEW-BKLAS,
+         MTART TYPE MARA-MTART,
+         MATKL TYPE MARA-MATKL,
+
+         MEINS TYPE CKMLPP-MEINS,
+         STATUS TYPE CKMLPP-STATUS,
+         LBKUM TYPE CKMLPP-LBKUM,
+         MENGE TYPE KKB_ML_MENGE,
+         PBPOPO TYPE CKMLPP-PBPOPO,
+         SALK3 TYPE CKMLCR-SALK3,
+         WERT TYPE KKB_ML_BEWER,
+         STPRS TYPE CKMLCR-STPRS,
+         PVPRS TYPE CKMLCR-PVPRS,
+         PEINH TYPE CKMLCR-PEINH,
+         WAERS TYPE CKMLCR-WAERS,
+         PBPRD_O TYPE CKMLCR-PBPRD_O,
+         PBKDM_O TYPE CKMLCR-PBKDM_O,
+         ESTPRD TYPE CKML_ESTPRD,
+         ESTKDM TYPE CKML_ESTKDM,
+         MSTPRD TYPE CKML_MSTPRD,
+         MSTKDM TYPE CKML_MSTKDM,
+         ESTDIF TYPE CK_SINGLELEVEL_DIF,
+         MSTDIF TYPE CK_MULTILEVEL_DIF,
+         PRDIF TYPE CK_SUM_PRDIF,
+         KRDIF TYPE CK_SUM_KRDIF,
+         SUMDIF TYPE CK_SUM_DIF,
+         COLOR(3) TYPE C,
+       END OF S_NDI.
+
+TYPES TY_OUT TYPE STANDARD TABLE OF S_NDI WITH KEY KALNR.
+
+TYPES: BEGIN OF TY_MVT,
+         KALNR TYPE CK_KALNR,
+       END OF TY_MVT.
+
+DATA: T_MATS TYPE TY_MATS  WITH HEADER LINE,
+      T_CKMLPP TYPE STANDARD TABLE OF CKMLPP
+               WITH KEY KALNR BDATJ POPER
+               WITH HEADER LINE,
+      T_CKMLCR TYPE STANDARD TABLE OF CKMLCR
+               WITH KEY KALNR BDATJ POPER CURTP
+               WITH HEADER LINE,
+      T_MLCD TYPE STANDARD TABLE OF MLCD
+               WITH KEY KALNR BDATJ POPER UNTPER CATEG PTYP BVALT CURTP
+               WITH HEADER LINE,
+      T_MLCD_NOT_ALLOC TYPE STANDARD TABLE OF MLCD
+               WITH KEY KALNR BDATJ POPER UNTPER CATEG PTYP BVALT CURTP
+               WITH HEADER LINE,
+      T_BAD  TYPE TY_OUT   WITH HEADER LINE,
+      T_MVT  TYPE TABLE OF TY_MVT WITH HEADER LINE.
+
+*DATA IT_LOG LIKE ZTCO_BATCH_LOG OCCURS 0 WITH HEADER LINE.
+
+DATA: BEGIN OF I_PROC_KALNR OCCURS 0,
+        WERKS LIKE CKMLMV001-WERKS,
+        MATNR LIKE CKMLMV001-MATNR,
+        BWTAR LIKE CKMLMV001-BWTAR,
+        PROCK LIKE CKMLMV001-PROC_KALNR,
+        BTYP  LIKE CKMLMV001-BTYP,  "bf-production, bb-procurement
+        KALNR LIKE CKMLHD-KALNR,
+      END OF I_PROC_KALNR.
+
+DATA: GV_DATE1 TYPE SYDATUM,  "start
+      GV_DATE2 TYPE SYDATUM,  "end
+      GV_DATE3 TYPE SYDATUM.  "next end
+
+RANGES R_KALNR FOR ZTCO_MLIT-KALNR.
+
+*--- ALV
+TYPE-POOLS: SLIS.
+DATA : W_FIELDCAT TYPE SLIS_T_FIELDCAT_ALV WITH HEADER LINE,
+       W_EVENTCAT TYPE SLIS_T_EVENT WITH HEADER LINE,
+       W_SELFIELD TYPE SLIS_SELFIELD,
+       W_SORTCAT  TYPE SLIS_T_SORTINFO_ALV WITH HEADER LINE,
+       W_COL_POS  TYPE I,
+       W_PROGRAM  LIKE SY-REPID,
+       W_TOP_OF_PAGE TYPE SLIS_T_LISTHEADER,
+       W_LINE1 TYPE SLIS_LISTHEADER.
+
+DATA: GT_FIELDCAT TYPE SLIS_T_FIELDCAT_ALV,
+      GS_FIELDCAT          TYPE SLIS_FIELDCAT_ALV,
+      GS_LAYOUT   TYPE SLIS_LAYOUT_ALV,
+      GT_SP_GROUP TYPE SLIS_T_SP_GROUP_ALV,
+      GT_EVENTS   TYPE SLIS_T_EVENT,
+      GT_SORTS    TYPE SLIS_T_SORTINFO_ALV WITH HEADER LINE,
+      GS_PRNT     TYPE SLIS_PRINT_ALV,
+      G_REPID     LIKE SY-REPID,
+      G_PF_STATUS_SET  TYPE SLIS_FORMNAME VALUE 'PF_STATUS_SET',
+      G_USER_COMMAND   TYPE SLIS_FORMNAME VALUE 'USER_COMMAND',
+      GS_VARIANT       LIKE DISVARIANT,
+      G_FORMNAME_TOP_OF_PAGE TYPE SLIS_FORMNAME
+                                   VALUE 'TOP_OF_PAGE'.
+*---- ALV
