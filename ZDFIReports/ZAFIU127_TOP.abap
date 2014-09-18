@@ -1,0 +1,130 @@
+*----------------------------------------------------------------------*
+*   INCLUDE ZACOU127_TOP                                               *
+*----------------------------------------------------------------------*
+
+DEFINE SELECT_OPTION_SCHECK.
+  SELECTION-SCREEN:
+    BEGIN OF LINE,
+    COMMENT 01(31) TEXT_200 FOR FIELD PAR_CHKF,
+    POSITION POS_LOW.
+  PARAMETERS:
+    PAR_CHKF LIKE PAYR-CHECF.
+  SELECTION-SCREEN:
+    COMMENT 52(05) TEXT_201 FOR FIELD PAR_CHKT,
+    POSITION POS_HIGH.
+  PARAMETERS:
+    PAR_CHKT LIKE PAYR-CHECT.
+  SELECTION-SCREEN:
+    END OF LINE.
+END-OF-DEFINITION.
+
+DEFINE BLOCK.
+  SELECTION-SCREEN BEGIN OF BLOCK &1 WITH FRAME TITLE TEXT_20&1.
+END-OF-DEFINITION.
+
+
+DEFINE GET_TEXT.
+  PERFORM TEXT(RFCHKL00) USING TEXT_20&1 20&1.
+END-OF-DEFINITION.
+
+TYPES: BEGIN OF TY_ROW_TAB,
+            ZBUKR TYPE DZBUKR,
+            HBKID TYPE HBKID,
+            HKTID TYPE HKTID,
+            LAUFI TYPE LAUFI,
+            RZAWE TYPE DZLSCH,
+            IND_C(1),
+            BANKN TYPE BANKN,
+            CHECT TYPE CHECT,
+            RWBTR TYPE RWBTR,
+            LAUFD TYPE LAUFD,
+            ZNME1 TYPE DZNME1,
+            WAERS TYPE WAERS,
+            VOIDR TYPE VOIDR,
+           $CHECT(10) TYPE N,
+           $RWBTR(10) TYPE N,
+           $LAUFD(8),
+           SELECT TYPE C,
+       END   OF  TY_ROW_TAB.
+
+DATA : BEGIN OF IT_COLOR OCCURS 0,
+         MATNR1 TYPE MATNR,
+         MATNR2 TYPE MATNR,
+       END OF IT_COLOR.
+
+* Type for ALV
+TYPES: BEGIN OF TY_OUT.
+INCLUDE  TYPE TY_ROW_TAB.
+TYPES: END OF TY_OUT.
+
+DATA  : IT_ROW_TAB TYPE TABLE OF TY_ROW_TAB WITH HEADER LINE,
+        GT_OUT     TYPE TABLE OF TY_OUT     WITH HEADER LINE .
+
+* for possible entry
+DATA: BEGIN OF DYNPFIELDS OCCURS 3.
+        INCLUDE STRUCTURE DYNPREAD.
+DATA: END OF DYNPFIELDS.
+
+DATA: DYNAME         TYPE PROGNAME,
+      DYNUMB         TYPE SYCHAR04,
+      EXC_EXCTAB     TYPE SLIS_T_EXTAB,
+      POPUP_FIELDCAT TYPE SLIS_T_FIELDCAT_ALV,
+      F              TYPE SLIS_FIELDCAT_ALV,
+      SELFIELD       TYPE SLIS_SELFIELD,
+      EXITFIELD,
+      COLOR_ACTIVE(3)  VALUE 'C50',
+      TABIX LIKE SY-TABIX.
+*----------------------------------------------------------------------*
+* Macros
+*----------------------------------------------------------------------*
+
+DEFINE __CLS.                          " clear & refresh
+  CLEAR &1.REFRESH &1.
+END-OF-DEFINITION.
+
+DEFINE __PROCESS.
+  PERFORM SHOW_PROGRESS USING &1 &2.
+END-OF-DEFINITION.
+
+DEFINE __MESSAGE.
+  CALL FUNCTION 'POPUP_TO_INFORM'
+       EXPORTING
+            TITEL = &1
+            TXT1  = &2
+            TXT2  = SY-SUBRC.
+END-OF-DEFINITION.
+
+****************************** constants *******************************
+CONSTANTS:  FALSE VALUE ' ',
+            TRUE  VALUE 'X'.
+
+*----------------------------------------------------------------------*
+* Others
+*----------------------------------------------------------------------*
+* ETC.
+DATA: G_ERROR(1),
+      G_REPID  LIKE SY-REPID.
+
+RANGES:
+  SEL_WAER  FOR PAYR-WAERS,
+  SEL_LAUD  FOR PAYR-LAUFD,
+  SEL_LAUI  FOR PAYR-LAUFI.
+
+CONSTANTS:
+  CON_REPORT_CHECK_REGISTER TYPE REPID VALUE 'RFCHKN10',
+  CON_FLG_ALV_SAVE          TYPE CHAR1 VALUE 'A',
+  CON_ALV_HANDLE LIKE DISVARIANT-HANDLE VALUE 'NORM'.
+
+DATA:
+ G_APPLICATION_SYSTEM_TYPE TYPE CHAR1,
+ G_SUBRC LIKE SY-SUBRC,
+  BEGIN OF TAB_LAUFK OCCURS 1.
+        INCLUDE STRUCTURE ILAUFK.
+DATA: END OF TAB_LAUFK,
+HLP_BETRG    LIKE PAYR-RWBTR,
+HLP_MODE     TYPE P,
+HLP_LINE     LIKE IFIBL_AUX_FIELDS-ALLGLINE,
+HLP_EXTRD(8) TYPE C,
+HLP_EXTRT(8) TYPE C.
+DATA   ALV_VARIANT      LIKE DISVARIANT.
+RANGES SEL_BUKR FOR PAYR-ZBUKR.
