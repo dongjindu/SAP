@@ -1,0 +1,62 @@
+FUNCTION Z_HR_ESS_GET_EMP_EMERGENCY_CON .
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(EMPLOYEE_NUMBER) LIKE  BAPI7004-PERNR
+*"  TABLES
+*"      ZESS_EMP_EMERGENCY_CON STRUCTURE  ZESS_EMP_EMERGENCY_CONTACT
+*"      RETURN STRUCTURE  BAPIRETURN
+*"----------------------------------------------------------------------
+
+  __CLS P0021.
+
+  CALL FUNCTION 'HR_READ_INFOTYPE'
+       EXPORTING
+            PERNR     = EMPLOYEE_NUMBER
+            INFTY     = '0021'
+            BEGDA     = SY-DATUM
+            ENDDA     = '99991231'
+            BYPASS_BUFFER = 'X'
+       TABLES
+            INFTY_TAB = P0021.
+  IF SY-SUBRC NE 0.
+    RETURN-TYPE = 'E'.
+    RETURN-MESSAGE = 'Invalid Employee Number'.
+    APPEND RETURN.
+    EXIT.
+  ENDIF.
+
+  CALL FUNCTION 'HR_READ_INFOTYPE'
+       EXPORTING
+            PERNR     = EMPLOYEE_NUMBER
+            INFTY     = '0106'
+            BEGDA     = SY-DATUM
+            ENDDA     = '99991231'
+            BYPASS_BUFFER = 'X'
+       TABLES
+            INFTY_TAB = P0106.
+
+
+  LOOP AT P0021.
+
+    CHECK P0021-FAMSA EQ '7'.
+    CLEAR  ZESS_EMP_EMERGENCY_CON.
+    ZESS_EMP_EMERGENCY_CON-FIRST_NAME = P0021-FAVOR.
+    ZESS_EMP_EMERGENCY_CON-LAST_NAME =  P0021-FANAM.
+    ZESS_EMP_EMERGENCY_CON-INITIALS = P0021-FINIT.
+    READ TABLE P0106 WITH KEY SUBTY = P0021-SUBTY
+                              OBJPS = P0021-OBJPS.
+    IF SY-SUBRC EQ 0.
+      ZESS_EMP_EMERGENCY_CON-TELEPHONE = P0106-TELNR.
+      PERFORM FILTER_NUMBER CHANGING ZESS_EMP_EMERGENCY_CON-TELEPHONE.
+    ENDIF.
+
+    ZESS_EMP_EMERGENCY_CON-OBJPS = P0021-OBJPS.
+    APPEND ZESS_EMP_EMERGENCY_CON.
+  ENDLOOP.
+
+  RETURN-TYPE = 'S'.
+  RETURN-MESSAGE = 'Success!'.
+  APPEND RETURN.
+
+ENDFUNCTION.

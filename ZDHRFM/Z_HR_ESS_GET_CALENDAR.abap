@@ -1,0 +1,120 @@
+FUNCTION Z_HR_ESS_GET_CALENDAR.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(EMPLOYEE_NUMBER) TYPE  BAPI7004-PERNR
+*"     VALUE(YYYYMM) TYPE  CHAR6
+*"     VALUE(CALENDAR_ID) LIKE  SCAL-FCALID DEFAULT 'HM'
+*"  TABLES
+*"      ZESS_CALENDAR STRUCTURE  ZESS_CALENDAR
+*"      RETURN STRUCTURE  BAPIRETURN
+*"----------------------------------------------------------------------
+
+  DATA : BEGIN OF I_PAY_DATE OCCURS 0,
+         PDATE LIKE T549S-PDATE,
+         PABRP LIKE T549S-PABRP,
+         END OF I_PAY_DATE,
+         $FIRST_DATE TYPE DATUM,
+         $LAST_DATE TYPE DATUM,
+         $COUNT(2) TYPE N,
+         $DATUM TYPE DATUM,
+         $DD(2) TYPE N.
+
+  SELECT SINGLE * FROM PA0001 WHERE PERNR EQ EMPLOYEE_NUMBER.
+  IF SY-SUBRC NE 0.
+    RETURN-TYPE = 'E'.
+    RETURN-MESSAGE = 'Invalid Employee Number'.
+    APPEND RETURN.
+    EXIT.
+  ENDIF.
+
+  DATA IHOLIDAY TYPE STANDARD TABLE OF ISCAL_DAY WITH HEADER LINE.
+
+  CONCATENATE YYYYMM '01' INTO $FIRST_DATE.
+
+  CALL FUNCTION 'SG_PS_GET_LAST_DAY_OF_MONTH'
+       EXPORTING
+            DAY_IN            = $FIRST_DATE
+       IMPORTING
+            LAST_DAY_OF_MONTH = $LAST_DATE
+       EXCEPTIONS
+            DAY_IN_NOT_VALID  = 1
+            OTHERS            = 2.
+
+  IF SY-SUBRC <> 0.
+    RETURN-TYPE = 'E'.
+    RETURN-MESSAGE = 'Invalid Date'.
+    APPEND RETURN.
+    EXIT.
+  ENDIF.
+
+  SELECT SINGLE * FROM   T549A
+                   WHERE ABKRS EQ PA0001-ABKRS.
+
+  SELECT PDATE PABRP
+  INTO TABLE I_PAY_DATE
+  FROM T549S  WHERE MOLGA EQ '10'
+                AND PERMO EQ T549A-PERMO
+                AND PABRJ EQ YYYYMM(4)
+                AND DATID EQ '1'
+                AND ( PDATE BETWEEN $FIRST_DATE AND $LAST_DATE ) .
+
+  LOOP AT I_PAY_DATE.
+    ZESS_CALENDAR-TYPE = 'PAY_DATE'.
+    ZESS_CALENDAR-DATE = I_PAY_DATE-PDATE.
+    APPEND ZESS_CALENDAR.
+    CLEAR ZESS_CALENDAR.
+  ENDLOOP.
+
+  CALL FUNCTION 'HOLIDAY_GET'
+       EXPORTING
+            FACTORY_CALENDAR = CALENDAR_ID
+            DATE_FROM        = $FIRST_DATE
+            DATE_TO          = $LAST_DATE
+       TABLES
+            HOLIDAYS         = IHOLIDAY.
+
+  LOOP AT IHOLIDAY.
+
+    IF IHOLIDAY-HOLIDAY EQ TRUE.
+      ZESS_CALENDAR-TYPE = 'PUBLIC_HOLIDAY'.
+      ZESS_CALENDAR-DATE = IHOLIDAY-DATE.
+      ZESS_CALENDAR-TXT_SHORT = IHOLIDAY-TXT_SHORT.
+      ZESS_CALENDAR-TXT_LONG =  IHOLIDAY-TXT_LONG.
+      APPEND ZESS_CALENDAR.
+      CLEAR ZESS_CALENDAR.
+    ENDIF.
+  ENDLOOP.
+
+  $COUNT = $LAST_DATE+6(2).
+
+  DO $COUNT TIMES.
+    $DD = SY-INDEX.
+    CONCATENATE $FIRST_DATE(6) $DD INTO $DATUM.
+
+    CALL FUNCTION 'DATE_CHECK_WORKINGDAY'
+         EXPORTING
+              DATE                       = $DATUM
+              FACTORY_CALENDAR_ID        = CALENDAR_ID
+              MESSAGE_TYPE               = 'E'
+         EXCEPTIONS
+              DATE_AFTER_RANGE           = 1
+              DATE_BEFORE_RANGE          = 2
+              DATE_INVALID               = 3
+              DATE_NO_WORKINGDAY         = 4
+              FACTORY_CALENDAR_NOT_FOUND = 5
+              MESSAGE_TYPE_INVALID       = 6
+              OTHERS                     = 7.
+    IF SY-SUBRC EQ 4.
+      ZESS_CALENDAR-TYPE = 'NO_WORKINGDAY'.
+      ZESS_CALENDAR-DATE = $DATUM.
+      APPEND ZESS_CALENDAR.
+      CLEAR ZESS_CALENDAR.
+    ENDIF.
+  ENDDO.
+
+  RETURN-TYPE = 'S'.
+  RETURN-MESSAGE = 'Success!'.
+  APPEND RETURN.
+
+ENDFUNCTION.

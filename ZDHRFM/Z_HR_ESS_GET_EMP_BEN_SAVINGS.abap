@@ -1,0 +1,181 @@
+FUNCTION Z_HR_ESS_GET_EMP_BEN_SAVINGS.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(EMPLOYEE_NUMBER) LIKE  BAPI7004-PERNR
+*"  TABLES
+*"      ZESS_EMP_BENEFIT_DATA STRUCTURE  ZESS_EMP_BENEFIT_DATA_SAVINGS
+*"      ZESS_EMP_BEN_DATA_INSUR_ITEM STRUCTURE
+*"        ZESS_EMP_BEN_DATA_INSUR_ITEM
+*"      RETURN STRUCTURE  BAPIRETURN
+*"----------------------------------------------------------------------
+* Modification Logs
+* Date       Developer  Request ID  Description
+* 12/12/2012 VALERIAN   UD1K955925  Exclude Lock Data from retrieval
+*-----------------------------------------------------------------------
+
+  DATA : ERROR_TABLE LIKE RPBENERR OCCURS 0,
+*         EEPER LIKE Q0169-EEPER,
+         SUBRC LIKE SY-SUBRC,
+         EE_BENEFIT_DATA LIKE RPBENEEDAT,
+         H74FA LIKE T74FA,
+         H74FB LIKE T74FB,
+         H74FC LIKE T74FC.
+
+  DATA : DTYXX TYPE BEN_DEPTYP,
+         DIDXX TYPE BEN_DEPID,
+         CTYXX TYPE BEN_DEPTYP,
+         CIDXX TYPE BEN_DEPID,
+         BPTXX TYPE BEN_BPRCNT,
+         CPTXX TYPE BEN_BPRCNT.
+
+  DATA : BEGIN OF I_MEMORY OCCURS 0,
+          PERNR LIKE PA0000-PERNR,
+          SEQNO(2) TYPE N,
+          SUBTY LIKE PA0021-SUBTY,
+          VORNA LIKE PA0002-VORNA, "
+          PERID LIKE PA0002-PERID, "
+          GBDAT LIKE PA0002-GBDAT, "
+          OBJPS LIKE PA0021-OBJPS,
+          MIDNM LIKE PA0002-MIDNM,
+          NACHN LIKE PA0002-NACHN, "
+          BEGDA LIKE PA0168-BEGDA, "
+          ENDDA LIKE PA0168-ENDDA, "
+          DTYXX LIKE PA0168-DTY01,
+          TRDAT LIKE PA0168-ENDDA,
+          GENDR(10),
+          RELCODE(10),             "
+         END OF I_MEMORY.
+
+  __CLS : ZESS_EMP_BENEFIT_DATA,P0169.
+
+  CALL FUNCTION 'HR_READ_INFOTYPE'
+       EXPORTING
+            PERNR         = EMPLOYEE_NUMBER
+            INFTY         = '0169'
+            BEGDA         = SY-DATUM
+            ENDDA         = '99991231'
+            BYPASS_BUFFER = 'X'
+       TABLES
+            INFTY_TAB     = P0169.
+
+  IF SY-SUBRC NE 0.
+    RETURN-TYPE = 'E'.
+    RETURN-MESSAGE = 'Invalid Employee Number'.
+    APPEND RETURN.
+    EXIT.
+  ENDIF.
+
+* LOOP AT P0169.                                           "UD1K955925
+  LOOP AT P0169 WHERE sprps IS INITIAL.                    "UD1K955925
+
+    CLEAR ZESS_EMP_BENEFIT_DATA.
+    SELECT SINGLE LTEXT INTO ZESS_EMP_BENEFIT_DATA-BEBEFIT_PLAN
+    FROM T5UCA WHERE BAREA = P0169-BAREA
+                 AND BPLAN = P0169-BPLAN
+                 AND LANGU = SY-LANGU.
+
+    ZESS_EMP_BENEFIT_DATA-START_DATE = P0169-BEGDA.
+    ZESS_EMP_BENEFIT_DATA-END_DATE = P0169-ENDDA.
+
+    ZESS_EMP_BENEFIT_DATA-EE_PERCENTAGE = P0169-EEPCT.
+    ZESS_EMP_BENEFIT_DATA-ROLLED_OVER = P0169-ROLLO.
+    ZESS_EMP_BENEFIT_DATA-BPLAN = P0169-BPLAN.
+    APPEND ZESS_EMP_BENEFIT_DATA.
+
+    DO 20 TIMES VARYING DTYXX FROM P0169-DTY01
+                              NEXT P0169-DTY02
+                VARYING DIDXX FROM P0169-DID01
+                              NEXT P0169-DID02
+                VARYING CTYXX FROM P0169-CTY01
+                              NEXT P0169-CTY02
+                VARYING CIDXX FROM P0169-CID01
+                              NEXT P0169-CID02
+                VARYING BPTXX FROM P0169-BPT01
+                              NEXT P0169-BPT02
+                VARYING CPTXX FROM P0169-CPT01
+                              NEXT P0169-CPT02.
+
+      IF NOT DTYXX  EQ '0000' AND NOT DTYXX  EQ SPACE.
+        SELECT SINGLE * FROM PA0021
+         WHERE PERNR EQ P0169-PERNR
+           AND SUBTY EQ DTYXX
+           AND OBJPS EQ DIDXX
+           AND BEGDA <= SY-DATUM
+           AND ENDDA >= SY-DATUM.
+
+        IF SY-SUBRC EQ 0.
+          CONCATENATE PA0021-FAVOR PA0021-FANAM PA0021-FNMZU INTO
+         ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_NAME SEPARATED BY SPACE.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_VAL_BEGDA = P0169-BEGDA.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_VAL_ENDDA = P0169-ENDDA.
+
+          CASE DTYXX.
+            WHEN 'H'.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Subscriber'.
+            WHEN '1'.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Spouse'.
+            WHEN '2' OR '6' OR '9' OR '13'.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Child'.
+            WHEN OTHERS.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Others'.
+          ENDCASE.
+
+
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BPLAN =
+                        ZESS_EMP_BENEFIT_DATA-BPLAN.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_CONTINGENT  = FALSE.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_PERCENTAGE = BPTXX.
+          APPEND ZESS_EMP_BEN_DATA_INSUR_ITEM.
+
+        ENDIF.
+
+      ENDIF.
+
+      IF NOT CTYXX  EQ '0000' AND NOT CTYXX  EQ SPACE.
+
+        SELECT SINGLE * FROM PA0021
+         WHERE PERNR EQ P0169-PERNR
+           AND SUBTY EQ CTYXX
+           AND OBJPS EQ CIDXX
+           AND BEGDA <= SY-DATUM
+           AND ENDDA >= SY-DATUM.
+
+        IF SY-SUBRC EQ 0.
+          CONCATENATE PA0021-FAVOR PA0021-FANAM PA0021-FNMZU INTO
+         ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_NAME SEPARATED BY SPACE.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_VAL_BEGDA = PA0021-BEGDA.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_VAL_ENDDA = PA0021-ENDDA.
+
+          CASE CTYXX.
+            WHEN 'H'.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Subscriber'.
+            WHEN '1'.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Spouse'.
+            WHEN '2' OR '6' OR '9' OR '13'.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Child'.
+            WHEN OTHERS.
+              ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_RELATIONS = 'Others'.
+          ENDCASE.
+
+
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BPLAN =
+                        ZESS_EMP_BENEFIT_DATA-BPLAN.
+
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_CONTINGENT  = TRUE.
+          ZESS_EMP_BEN_DATA_INSUR_ITEM-BEN_PERCENTAGE = CPTXX.
+          APPEND ZESS_EMP_BEN_DATA_INSUR_ITEM.
+
+        ENDIF.
+
+      ENDIF.
+
+    ENDDO.
+
+  ENDLOOP.
+
+  RETURN-TYPE = 'S'.
+  RETURN-MESSAGE = 'Success!'.
+  APPEND RETURN.
+
+ENDFUNCTION.

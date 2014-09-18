@@ -1,0 +1,111 @@
+FUNCTION Z_HR_ESS_UPD_EMP_EMAIL.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(EMPLOYEE_NUMBER) LIKE  BAPI7004-PERNR
+*"     VALUE(CREATE) TYPE  CHAR1 OPTIONAL
+*"     VALUE(UPDATE) TYPE  CHAR1 OPTIONAL
+*"     VALUE(EMAIL_ADDR) LIKE  PA0105-USRID_LONG OPTIONAL
+*"  TABLES
+*"      RETURN STRUCTURE  BAPIRETURN
+*"----------------------------------------------------------------------
+
+* {
+
+  DATA RETURN1 LIKE BAPIRETURN1 OCCURS 0 WITH HEADER LINE.
+
+  CALL FUNCTION 'BAPI_EMPLOYEE_ENQUEUE'
+       EXPORTING
+            NUMBER = EMPLOYEE_NUMBER
+       IMPORTING
+            RETURN = RETURN1.
+
+  IF RETURN1-TYPE EQ 'E'.
+    RETURN-TYPE = 'I'.
+    RETURN-MESSAGE = 'Record is locked. Please try again later.'.
+    APPEND RETURN.
+    EXIT.
+  ENDIF.
+
+  CALL FUNCTION 'BAPI_EMPLOYEE_DEQUEUE'
+       EXPORTING
+            NUMBER = EMPLOYEE_NUMBER
+       IMPORTING
+            RETURN = RETURN1.
+* }
+
+  DATA $DATE LIKE SY-DATUM.
+
+  IF CREATE IS INITIAL AND UPDATE IS INITIAL.
+    RETURN-TYPE = 'E'.
+    RETURN-MESSAGE = 'Select Create or Update'.
+    APPEND RETURN.
+    EXIT.
+  ENDIF.
+
+  SELECT SINGLE * FROM PA0105  WHERE PERNR EQ EMPLOYEE_NUMBER
+                                AND USRTY EQ '0030'
+                                AND ENDDA EQ '99991231'.
+  IF SY-SUBRC EQ 0.
+     *PA0105 = PA0105.
+  ELSE.
+    CLEAR *PA0105.
+  ENDIF.
+
+  IF UPDATE EQ TRUE.
+
+    UPDATE PA0105  SET USRID_LONG = EMAIL_ADDR
+                       AEDTM = SY-DATUM
+                       UNAME = SY-UNAME
+                WHERE PERNR EQ EMPLOYEE_NUMBER
+                  AND USRTY EQ '0030'
+                  AND ENDDA EQ '99991231'.
+
+    IF SY-SUBRC NE 0.
+      UPDATE = FALSE.
+      CREATE = TRUE.
+    ENDIF.
+    COMMIT WORK.
+  ENDIF.
+
+  IF CREATE EQ TRUE.
+
+    $DATE = SY-DATUM - 1 .
+    DELETE FROM PA0105 WHERE PERNR EQ EMPLOYEE_NUMBER
+                         AND USRTY EQ '0030'
+                         AND ENDDA EQ $DATE.
+
+    IF *PA0105-PERNR IS INITIAL.
+       *PA0105-PERNR = EMPLOYEE_NUMBER.
+       *PA0105-BEGDA = SY-DATUM.
+       *PA0105-ENDDA = '99991231'.
+       *PA0105-SUBTY = '0030'.
+    ELSE.
+      UPDATE PA0105  SET ENDDA = $DATE
+                  WHERE PERNR EQ EMPLOYEE_NUMBER
+                    AND USRTY EQ '0030'
+                    AND ENDDA EQ '99991231'.
+    ENDIF.
+
+     *PA0105-USRID_LONG = EMAIL_ADDR.
+     *PA0105-USRTY = '0030'.
+     *PA0105-AEDTM = SY-DATUM.
+     *PA0105-UNAME = SY-UNAME.
+
+    INSERT PA0105 FROM *PA0105.
+
+    IF SY-SUBRC NE 0.
+      ROLLBACK WORK.
+      RETURN-TYPE = 'E'.
+      RETURN-MESSAGE = 'Error Occured when Insert'.
+      APPEND RETURN.
+      EXIT.
+    ENDIF.
+    COMMIT WORK.
+  ENDIF.
+
+  RETURN-TYPE = 'S'.
+  RETURN-MESSAGE = 'Success!'.
+  APPEND RETURN.
+
+ENDFUNCTION.

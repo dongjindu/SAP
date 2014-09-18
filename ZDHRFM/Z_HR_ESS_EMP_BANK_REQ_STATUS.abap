@@ -1,0 +1,40 @@
+FUNCTION Z_HR_ESS_EMP_BANK_REQ_STATUS.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"  IMPORTING
+*"     VALUE(EMPLOYEE_NUMBER) LIKE  BAPI7004-PERNR
+*"  TABLES
+*"      ZESS_EMP_BANK_DETAIL STRUCTURE  ZESS_EMP_BANK_DETAIL
+*"      RETURN STRUCTURE  BAPIRETURN
+*"----------------------------------------------------------------------
+  DATA ITAB LIKE ZESS_BANK_IF_REQ OCCURS 0 WITH HEADER LINE.
+
+  SELECT * FROM ZESS_BANK_IF_REQ
+  WHERE PERNR EQ EMPLOYEE_NUMBER
+   AND STATUS NE 'C'
+   ORDER BY REQDATE DESCENDING.
+    IF SY-DBCNT > 5.
+      EXIT.
+    ENDIF.
+    ITAB = ZESS_BANK_IF_REQ.
+    APPEND ITAB.
+  ENDSELECT.
+
+  READ TABLE ITAB INDEX 1.
+
+  IF SY-SUBRC EQ 0.
+    LOOP AT ITAB.
+      MOVE-CORRESPONDING ITAB TO ZESS_EMP_BANK_DETAIL.
+      APPEND ZESS_EMP_BANK_DETAIL.
+    ENDLOOP.
+    RETURN-TYPE = 'S'.
+    RETURN-MESSAGE =
+    'The request has not been processed.'.
+    APPEND RETURN.
+  ELSE.
+    RETURN-TYPE = 'S'.
+    RETURN-MESSAGE = 'All request has been processed.'.
+    APPEND RETURN.
+  ENDIF.
+
+ENDFUNCTION.

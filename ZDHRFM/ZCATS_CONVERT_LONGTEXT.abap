@@ -1,0 +1,116 @@
+FUNCTION ZCATS_CONVERT_LONGTEXT.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"       IMPORTING
+*"             VALUE(CATS_TEXT_FORMAT) TYPE  CATS_TEXT_FORMAT
+*"             VALUE(DIRECTION) TYPE  C
+*"             VALUE(TEXT_HEADER) TYPE  THEAD OPTIONAL
+*"       TABLES
+*"              IT_LONGTEXT_ITF STRUCTURE  TLINE
+*"              IT_LONGTEXT_FOR STRUCTURE  TLINE
+*"       EXCEPTIONS
+*"              WRONG_DIRECTION
+*"              WRONG_TEXT_FORMAT
+*"----------------------------------------------------------------------
+
+  CONSTANTS: TEXT_OBJECT LIKE THEAD-TDOBJECT VALUE 'CATS',
+             TEXT_ID     LIKE THEAD-TDID     VALUE 'CATS'.
+
+  DATA: L_DIRECTION(6)  TYPE C,
+        L_HEADER        TYPE THEAD,
+        WA_LONGTEXT_FOR TYPE TLINE.
+
+  FIELD-SYMBOLS: <LONGTEXT_FOR> TYPE TLINE.
+
+  IF DIRECTION <> 'I' AND
+     DIRECTION <> 'E'.
+
+    RAISE WRONG_DIRECTION.
+
+  ENDIF.
+
+  IF ( DIRECTION = 'I' AND
+       CATS_TEXT_FORMAT <> 'ITF' )
+     OR
+     ( DIRECTION = 'E' AND
+       CATS_TEXT_FORMAT <> 'ITF'   AND
+       CATS_TEXT_FORMAT <> 'ASCII' AND
+       CATS_TEXT_FORMAT <> 'RTF' ).
+
+    RAISE WRONG_TEXT_FORMAT.
+
+  ENDIF.
+
+
+  CLEAR L_HEADER.
+
+  IF DIRECTION = 'I'.
+
+    L_DIRECTION = 'IMPORT'.
+
+    IF CATS_TEXT_FORMAT = 'ITF'  .
+
+      IT_LONGTEXT_ITF[] = IT_LONGTEXT_FOR[].
+      EXIT.
+
+    ELSE.
+
+      LOOP AT IT_LONGTEXT_FOR ASSIGNING <LONGTEXT_FOR>.
+
+        SHIFT <LONGTEXT_FOR> LEFT BY 2 PLACES.
+
+      ENDLOOP.
+
+      IF CATS_TEXT_FORMAT = 'RTF'.
+
+        L_HEADER-TDSPRAS = TEXT_HEADER-TDSPRAS.
+
+      ENDIF.
+
+    ENDIF.
+
+  ELSE.
+
+    L_DIRECTION = 'EXPORT'.
+
+    IF CATS_TEXT_FORMAT = 'RTF' OR
+       CATS_TEXT_FORMAT = 'ASCII'.
+
+      L_HEADER-TDSPRAS = TEXT_HEADER-TDSPRAS.
+
+      IF CATS_TEXT_FORMAT = 'RTF'.
+
+        L_HEADER-TDSTYLE = 'S_OFFICE'.
+        L_HEADER-TDFORM  = 'SYSTEM'.
+
+      ENDIF.
+
+    ELSEIF CATS_TEXT_FORMAT = 'ITF'.
+
+      IT_LONGTEXT_FOR[] = IT_LONGTEXT_ITF[].
+      EXIT.
+
+    ENDIF.
+
+  ENDIF.
+
+  CALL FUNCTION 'CONVERT_TEXT'
+       EXPORTING
+            DIRECTION   = L_DIRECTION
+            FORMAT_TYPE = CATS_TEXT_FORMAT
+            HEADER      = L_HEADER
+       TABLES
+            FOREIGN     = IT_LONGTEXT_FOR
+            ITF_LINES   = IT_LONGTEXT_ITF.
+
+  IF L_DIRECTION = 'EXPORT' AND CATS_TEXT_FORMAT <> 'ITF'.
+
+    LOOP AT IT_LONGTEXT_FOR ASSIGNING <LONGTEXT_FOR>.
+
+      SHIFT <LONGTEXT_FOR> RIGHT BY 2 PLACES.
+
+    ENDLOOP.
+
+  ENDIF.
+
+ENDFUNCTION.
