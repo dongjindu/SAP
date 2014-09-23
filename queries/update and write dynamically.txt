@@ -1,0 +1,60 @@
+form sub1.
+  data: lt001 type table of ztcou102 with header line.
+  data: lt002 type table of ztcou102 with header line.
+  select *
+    into corresponding fields of table lt001
+    from ztcou102
+    where kokrs = 'H201'
+      and bdatj = '2014'
+      and poper = '007'
+      "and kalka = ''
+      and matnr = '1140308806K'
+    .
+  loop at lt001.
+    lt001-poper = '010'.
+    lt001-werks = 'E002'.
+    modify lt001.
+  endloop.
+  data: lvexecutor type string.
+  lvexecutor = 'HIS20166'.
+  if sy-uname = lvexecutor. break-point. endif.
+  modify  ztcou102 from lt001.
+  refresh lt001. clear lt001.
+    select *
+    into corresponding fields of table lt001
+    from ztcou102
+    where kokrs = 'H201'
+      and bdatj = '2014'
+      and poper = '010'
+      "and kalka = ''
+      and matnr = '1140308806K'
+    .
+data: lvindex type i.
+data: lvstr type c length 1024.
+data: lvstr1 type c length 50.
+data: lvlength type i.
+data: lvtab(1) TYPE c VALUE cl_abap_char_utilities=>HORIZONTAL_TAB.
+data: lvposition type i.
+data: lvoffset type i.
+field-symbols: <fw> type any.
+loop at lt001.
+  clear lvstr.
+  lvposition = 0.
+  lvindex = 1.
+  if sy-uname eq lvexecutor. break-point. endif.
+  do.
+    assign component lvindex of structure lt001 to <fw>.
+    if sy-subrc <> 0. exit. endif.
+    lvstr1 = <fw>.
+"    lvlength = strlen( lvstr1 ).
+    describe field <fw> output-length lvlength.
+    if lvlength eq 0 and sy-uname eq lvexecutor. break-point. endif.
+    lvstr+lvposition(lvlength) = lvstr1. 
+    lvposition = lvposition + lvlength + 1.
+    lvindex = lvindex + 1.
+"    concatenate lvstr <fw> into lvstr separated by lvtab.
+  enddo.
+  write: / lvstr.
+endloop.
+
+endform.
